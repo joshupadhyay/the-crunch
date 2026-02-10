@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* The Crunch 70s Color Palette */
+  --color-crunch-cream: #fdf6ef;
+  --color-crunch-cream-dark: #f5e6d3;
+
+  /* Dark Walnut */
+  --color-crunch-walnut-50: #fdeee8;
+  --color-crunch-walnut-100: #faded1;
+  --color-crunch-walnut-200: #f5bda3;
+  --color-crunch-walnut-300: #f09c75;
+  --color-crunch-walnut-400: #ec7b46;
+  --color-crunch-walnut-500: #e75a18;
+  --color-crunch-walnut-600: #b94813;
+  --color-crunch-walnut-700: #8a360f;
+  --color-crunch-walnut-800: #5c240a;
+  --color-crunch-walnut-900: #2e1205;
+  --color-crunch-walnut-950: #200d03;
+
+  /* Dark Khaki */
+  --color-crunch-khaki-50: #f7f4ee;
+  --color-crunch-khaki-100: #efe9dc;
+  --color-crunch-khaki-200: #dfd4b9;
+  --color-crunch-khaki-300: #cfbe96;
+  --color-crunch-khaki-400: #bfa873;
+  --color-crunch-khaki-500: #af9250;
+  --color-crunch-khaki-600: #8c7540;
+  --color-crunch-khaki-700: #695830;
+  --color-crunch-khaki-800: #463b20;
+  --color-crunch-khaki-900: #231d10;
+  --color-crunch-khaki-950: #18140b;
+
+  /* Tiger Orange */
+  --color-crunch-orange-50: #fdf2e8;
+  --color-crunch-orange-100: #fae5d1;
+  --color-crunch-orange-200: #f6cba2;
+  --color-crunch-orange-300: #f1b074;
+  --color-crunch-orange-400: #ed9645;
+  --color-crunch-orange-500: #e87c17;
+  --color-crunch-orange-600: #ba6312;
+  --color-crunch-orange-700: #8b4a0e;
+  --color-crunch-orange-800: #5d3209;
+  --color-crunch-orange-900: #2e1905;
+  --color-crunch-orange-950: #201103;
+
+  /* Rich Mahogany */
+  --color-crunch-mahogany-50: #fcede8;
+  --color-crunch-mahogany-100: #f9dbd2;
+  --color-crunch-mahogany-200: #f4b7a4;
+  --color-crunch-mahogany-300: #ee9377;
+  --color-crunch-mahogany-400: #e96f49;
+  --color-crunch-mahogany-500: #e34a1c;
+  --color-crunch-mahogany-600: #b63c16;
+  --color-crunch-mahogany-700: #882d11;
+  --color-crunch-mahogany-800: #5b1e0b;
+  --color-crunch-mahogany-900: #2d0f06;
+  --color-crunch-mahogany-950: #200a04;
+
+  /* Rosy Copper */
+  --color-crunch-copper-50: #faeeeb;
+  --color-crunch-copper-100: #f4ddd7;
+  --color-crunch-copper-200: #e9bcaf;
+  --color-crunch-copper-300: #de9a87;
+  --color-crunch-copper-400: #d3785f;
+  --color-crunch-copper-500: #c85637;
+  --color-crunch-copper-600: #a0452c;
+  --color-crunch-copper-700: #783421;
+  --color-crunch-copper-800: #502316;
+  --color-crunch-copper-900: #28110b;
+  --color-crunch-copper-950: #1c0c08;
+
+  /* Cork board color */
+  --color-crunch-cork: #d4a574;
+
+  /* Typography */
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+
+  /* Keep existing shadcn variables */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+:root {
+  --background: #fdf6ef;
+  --foreground: #2e1205;
+  --card: #ffffff;
+  --card-foreground: #2e1205;
+  --popover: #ffffff;
+  --popover-foreground: #2e1205;
+  --primary: #b94813;
+  --primary-foreground: #fdf6ef;
+  --secondary: #f5bda3;
+  --secondary-foreground: #5c240a;
+  --muted: #efe9dc;
+  --muted-foreground: #8c7540;
+  --accent: #fae5d1;
+  --accent-foreground: #8a360f;
+  --destructive: #e34a1c;
+  --destructive-foreground: #fdf6ef;
+  --border: #f5bda3;
+  --input: #f5bda3;
+  --ring: #e75a18;
+  --radius: 0.75rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-crunch-cream text-foreground;
+  }
+}
