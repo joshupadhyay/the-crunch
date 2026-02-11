@@ -1,9 +1,12 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
-import { CHATDATABASE } from "./Database";
+import { LocalMapDB } from "./Database";
 
-const chatbot = new AnthropicChatBot(CHATDATABASE);
+/**
+ * Init Chatbot, with Local Map Database
+ */
+const chatbot = new AnthropicChatBot(new LocalMapDB());
 
 export const server = serve({
   routes: {
@@ -11,7 +14,7 @@ export const server = serve({
 
     "/api/chat/create": {
       async POST() {
-        const id = chatbot.createConversation();
+        const id = chatbot.DATABASE.createConversation();
         return Response.json(id);
       },
     },
@@ -23,7 +26,8 @@ export const server = serve({
           preview: string;
           messageCount: number;
         }[] = [];
-        for (const [id, messages] of CHATDATABASE.entries()) {
+        for (const id of chatbot.DATABASE.getAllConversations()) {
+          const messages = chatbot.DATABASE.getConversation(id);
           const firstUserMsg = messages.find((m) => m.role === "user");
           const preview = firstUserMsg
             ? typeof firstUserMsg.content === "string"
@@ -38,7 +42,8 @@ export const server = serve({
 
     "/api/chat/conversations/:id": {
       GET(req) {
-        const messages = CHATDATABASE.get(req.params.id);
+        const id = req.params.id;
+        const messages = chatbot.DATABASE.getConversation(id);
         if (!messages) {
           return Response.json({ error: "Not found" }, { status: 404 });
         }
@@ -56,17 +61,17 @@ export const server = serve({
             try {
               for await (const event of chatbot.streamMessage(
                 conversationId,
-                message
+                message,
               )) {
                 controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
+                  encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
                 );
               }
             } catch (err: any) {
               controller.enqueue(
                 encoder.encode(
-                  `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`
-                )
+                  `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`,
+                ),
               );
             } finally {
               controller.close();
@@ -90,5 +95,3 @@ export const server = serve({
     console: true,
   },
 });
-
-console.log(`🍽️ The Crunch running at ${server.url}`);
