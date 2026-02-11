@@ -8,6 +8,8 @@ export interface IDatabase {
 
   getConversation(id: string): MessageParam[];
 
+  getAllConversations(): string[];
+
   // this might be expensive to return the messages after a push?
   // Maybe just a confirmation of successful db transaction = more performant.
   pushMessage(
@@ -36,6 +38,14 @@ export class LocalMapDB implements IDatabase {
       throw new Error(`Conversation ${messages} does not exist.`);
     }
     return messages;
+  }
+
+  /**
+   *
+   * @returns string[] of all conversationIDs
+   */
+  getAllConversations(): string[] {
+    return CHATDATABASE.keys().toArray();
   }
 
   pushMessage(
