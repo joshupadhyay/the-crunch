@@ -27,15 +27,15 @@ export class LocalMapDB implements IDatabase {
 
   createConversation(): string {
     const newConversationID = randomUUIDv7().toString();
-    CHATDATABASE.set(newConversationID, []);
+    this.CHATDATABASE.set(newConversationID, []);
     return newConversationID;
   }
 
   getConversation(id: string) {
-    const messages = CHATDATABASE.get(id);
+    const messages = this.CHATDATABASE.get(id);
 
     if (!messages) {
-      throw new Error(`Conversation ${messages} does not exist.`);
+      throw new Error(`Conversation ${id} does not exist.`);
     }
     return messages;
   }
@@ -45,7 +45,7 @@ export class LocalMapDB implements IDatabase {
    * @returns string[] of all conversationIDs
    */
   getAllConversations(): string[] {
-    return CHATDATABASE.keys().toArray();
+    return this.CHATDATABASE.keys().toArray();
   }
 
   pushMessage(
