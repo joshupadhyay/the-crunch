@@ -3,22 +3,24 @@ import { randomUUIDv7 } from "bun";
 
 export const CHATDATABASE: Map<string, MessageParam[]> = new Map();
 
-export interface DatabaseInterface {
+export interface IDatabase {
   createConversation(): string;
 
   getConversation(id: string): MessageParam[];
 
+  // this might be expensive to return the messages after a push?
+  // Maybe just a confirmation of successful db transaction = more performant.
   pushMessage(
     id: string,
     role: "user" | "assistant",
-    message: string,
+    message: MessageParam["content"],
   ): MessageParam[];
 
   // this is how you specify optional function in interface
   deleteConversation?(id: string): void;
 }
 
-export class LocalStorage implements DatabaseInterface {
+export class LocalMapDB implements IDatabase {
   CHATDATABASE: Map<string, MessageParam[]> = new Map();
 
   createConversation(): string {
@@ -39,7 +41,7 @@ export class LocalStorage implements DatabaseInterface {
   pushMessage(
     id: string,
     role: "user" | "assistant",
-    message: string,
+    message: MessageParam["content"],
   ): MessageParam[] {
     const messages = this.getConversation(id);
 

@@ -1,12 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CHATDATABASE } from "./Database";
-import { randomUUIDv7 } from "bun";
+import type { IDatabase } from "./Database";
 import { SYSTEM_PROMPT } from "./system-prompt";
 import { TOOLS, executeTool } from "./tools";
-import type {
-  MessageCreateParams,
-  MessageParam,
-} from "@anthropic-ai/sdk/resources";
+import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
 
 export interface StreamEvent {
   type: "text" | "tool_start" | "tool_result" | "done" | "error";
@@ -16,7 +12,7 @@ export interface StreamEvent {
 }
 
 export class AnthropicChatBot {
-  DATABASE: typeof CHATDATABASE;
+  DATABASE: IDatabase;
   readonly client: Anthropic;
 
   params: Pick<MessageCreateParams, "max_tokens" | "model"> = {
@@ -24,24 +20,18 @@ export class AnthropicChatBot {
     model: "claude-sonnet-4-5-20250929",
   };
 
-  constructor(database: typeof CHATDATABASE) {
+  constructor(database: IDatabase) {
     this.DATABASE = database;
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY ?? "NO KEY DEFINED",
     });
   }
 
-  createConversation(): string {
-    const newConversationID = randomUUIDv7().toString();
-    this.DATABASE.set(newConversationID, []);
-    return newConversationID;
-  }
-
   async *streamMessage(
     conversationId: string,
     userMessage: string,
   ): AsyncGenerator<StreamEvent> {
-    const messages = this.DATABASE.get(conversationId);
+    const messages = this.DATABASE.getConversation(conversationId);
     if (!messages) {
       yield { type: "error", message: "Conversation ID not found" };
       return;
@@ -72,7 +62,11 @@ export class AnthropicChatBot {
       const finalMessage = await stream.finalMessage();
 
       // Add assistant response to conversation history
-      messages.push({ role: "assistant", content: finalMessage.content });
+      this.DATABASE.pushMessage(
+        conversationId,
+        "assistant",
+        finalMessage.content,
+      );
 
       if (finalMessage.stop_reason === "tool_use") {
         const toolUseBlocks = finalMessage.content.filter(
@@ -102,12 +96,7 @@ export class AnthropicChatBot {
           }),
         );
 
-        const toolResults: MessageParam = {
-          role: "user",
-          content: toolResultContent,
-        };
-
-        messages.push(toolResults);
+        this.DATABASE.pushMessage(conversationId, "user", toolResultContent);
         yield { type: "tool_result" };
         // Loop continues — next iteration streams the post-tool response
       } else {
