@@ -1,12 +1,13 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
-import { LocalMapDB } from "./databases/Database";
+import { SupabaseDB } from "./databases/SupabaseClient";
 
 /**
- * Init Chatbot, with Local Map Database
+ * Init Chatbot, with Supabase Database
  */
-const chatbot = new AnthropicChatBot(new LocalMapDB());
+const db = await SupabaseDB.connect();
+const chatbot = new AnthropicChatBot(db);
 
 export const server = serve({
   routes: {
@@ -72,6 +73,7 @@ export const server = serve({
                 );
               }
             } catch (err: any) {
+              console.error("[send] Stream error:", err);
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`,

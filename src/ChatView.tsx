@@ -107,6 +107,17 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
                 };
                 return updated;
               });
+            } else if (event.type === "error") {
+              console.error("[Crunch] Server error:", event.message);
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: `Something went wrong: ${event.message}`,
+                };
+                return updated;
+              });
+              setIsLoading(false);
             } else if (event.type === "done") {
               // Final extraction with context
               const { cleanText, context } = extractContext(fullText);

@@ -12,7 +12,11 @@ export interface StreamEvent {
   message?: string;
 }
 
+// TODO
+// What about tool calls? is this stored as JSONB? Is it better to be as text?
+// You will come back, this will bite you in the ass for sure...
 /** Convert domain Message[] to Anthropic SDK MessageParam[] */
+
 function toMessageParams(messages: Message[]): MessageParam[] {
   return messages.map((m) => {
     let content: MessageParam["content"];
@@ -36,7 +40,8 @@ export class AnthropicChatBot {
 
   params: Pick<MessageCreateParams, "max_tokens" | "model"> = {
     max_tokens: 4096,
-    model: "claude-sonnet-4-5-20250929",
+    // SAVE MONEY – DO NOT CHANGE THE MODEL TYPE
+    model: "claude-haiku-4-5-20251001",
   };
 
   constructor(database: IDatabase) {
