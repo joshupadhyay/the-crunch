@@ -1,0 +1,46 @@
+<mxfile host="65bd71144e">
+    <diagram id="e_JuzoF8QKnwDDg7Z53f" name="Page-1">
+        <mxGraphModel dx="685" dy="571" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="7" style="edgeStyle=none;html=1;startArrow=classicThin;startFill=1;endArrow=classicThin;endFill=1;" edge="1" parent="1" source="2" target="5">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" style="edgeStyle=none;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;startArrow=classic;startFill=1;endArrow=none;endFill=0;" edge="1" parent="1" source="2" target="8">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="PK - conversationID (UUID)&lt;div&gt;createdAt - time.now()&lt;/div&gt;&lt;div&gt;userID - via auth&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;*RLS - row level security&lt;/div&gt;&lt;div&gt;Filter conversationIDs by accesible userID&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="shape=datastore;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="95" y="170" width="250" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="Supabase PostgresQL Architecture" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=31;" vertex="1" parent="1">
+                    <mxGeometry x="95" y="50" width="510" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="&lt;b&gt;Conversation DB&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="155" y="130" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="PK – messageID (uuid)&lt;div&gt;FK - conversationID&lt;/div&gt;&lt;div&gt;createdAt - time.now()&lt;/div&gt;&lt;div&gt;role – (user / assistant)&amp;nbsp;&lt;/div&gt;&lt;div&gt;content: string / JSON (tool calls)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="shape=datastore;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="170" width="250" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="&lt;b&gt;Messages DB&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="580" y="140" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="&lt;div&gt;userID - Supabase handles this&lt;/div&gt;" style="shape=datastore;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="95" y="490" width="250" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="&lt;b&gt;Supabase Auth DB&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="440" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="&lt;b&gt;PROPOSED ARCH:&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;- user signs in via Supabase. Pull conversations matching user ID&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;- List of conversations - pull mesages via conversationID&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;- MessagesDB can filter by conversationID, createdAt time&amp;nbsp;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="450" y="430" width="400" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="user signs in to see conversations" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="250" y="420" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="conversations&lt;div&gt;consist of&lt;/div&gt;&lt;div&gt;messages&lt;/div&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="410" y="230" width="60" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

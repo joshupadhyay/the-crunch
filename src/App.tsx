@@ -24,7 +24,7 @@ export function App() {
   useEffect(() => {
     async function init() {
       const res = await fetch("/api/chat/create", { method: "POST" });
-      const id: string = await res.json();
+      const { id } = await res.json();
       setConversationId(id);
     }
     init();
