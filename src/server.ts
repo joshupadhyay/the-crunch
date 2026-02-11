@@ -96,6 +96,8 @@ export const server = serve({
     },
   },
 
+  idleTimeout: 60, // seconds — SSE streams need longer than the 10s default
+
   development: process.env.NODE_ENV !== "production" && {
     hmr: true,
     console: true,
