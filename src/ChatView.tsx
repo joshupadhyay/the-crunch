@@ -157,12 +157,12 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
-      <header className="px-6 py-4 border-b-2 border-crunch-walnut-200 bg-crunch-cream">
-        <h1 className="font-display text-3xl font-black text-crunch-mahogany-700 tracking-tight">
+      <header className="px-6 py-4 border-b-2 border-crunch-mahogany-200 bg-crunch-cream">
+        <h1 className="font-display text-3xl font-black text-crunch-mahogany-800 tracking-tight">
           The Crunch
         </h1>
         <p className="text-crunch-khaki-600 text-sm mt-0.5">
-          Your groovy dining concierge
+          Let's have a time!
         </p>
       </header>
 
@@ -230,9 +230,24 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
               <div className="flex justify-start">
                 <div className="bg-white text-crunch-walnut-600 rounded-2xl rounded-bl-sm border border-crunch-walnut-100 shadow-sm px-4 py-3">
                   <span className="inline-flex gap-1 text-lg">
-                    <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+                    <span
+                      className="animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    >
+                      .
+                    </span>
+                    <span
+                      className="animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    >
+                      .
+                    </span>
+                    <span
+                      className="animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    >
+                      .
+                    </span>
                   </span>
                 </div>
               </div>

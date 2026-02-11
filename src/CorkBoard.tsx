@@ -11,9 +11,12 @@ export function CorkBoard({ preferences, restaurants }: CorkBoardProps) {
   const hasContent = preferences.length > 0 || restaurants.length > 0;
 
   return (
-    <aside className="w-80 h-full border-l-2 border-crunch-walnut-300 bg-crunch-cork flex flex-col overflow-hidden shrink-0">
+    <aside
+      className="w-80 h-full bg-crunch-cork flex flex-col overflow-hidden shrink-0"
+      style={{ boxShadow: "inset 10px 0 20px rgba(0,0,0,0.2)" }}
+    >
       {/* Cork board header */}
-      <div className="px-4 py-3 border-b-2 border-crunch-walnut-300 bg-crunch-walnut-800">
+      <div className="px-4 py-3 border-b-2 border-crunch-mahogany-700 bg-crunch-mahogany-800">
         <h2 className="font-display text-lg font-bold text-crunch-cream tracking-wide">
           The Board
         </h2>
@@ -26,7 +29,7 @@ export function CorkBoard({ preferences, restaurants }: CorkBoardProps) {
       <div className="flex-1 overflow-y-auto p-4">
         {!hasContent ? (
           <div className="h-full flex items-center justify-center">
-            <p className="text-crunch-walnut-500 text-sm text-center italic px-4 leading-relaxed">
+            <p className="text-crunch-walnut-700 text-sm text-center italic px-4 leading-relaxed">
               Start chatting and I'll pin your preferences and restaurant picks
               here, dig?
             </p>

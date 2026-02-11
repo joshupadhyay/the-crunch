@@ -39,7 +39,7 @@ export class AnthropicChatBot {
 
   async *streamMessage(
     conversationId: string,
-    userMessage: string
+    userMessage: string,
   ): AsyncGenerator<StreamEvent> {
     const messages = this.DATABASE.get(conversationId);
     if (!messages) {
@@ -76,7 +76,7 @@ export class AnthropicChatBot {
 
       if (finalMessage.stop_reason === "tool_use") {
         const toolUseBlocks = finalMessage.content.filter(
-          (block) => block.type === "tool_use"
+          (block) => block.type === "tool_use",
         );
 
         // Notify client about tool execution
@@ -92,14 +92,14 @@ export class AnthropicChatBot {
             if (toolUse.type !== "tool_use") return toolUse as any;
             const result = await executeTool(
               toolUse.name,
-              toolUse.input as Record<string, unknown>
+              toolUse.input as Record<string, unknown>,
             );
             return {
               type: "tool_result" as const,
               tool_use_id: toolUse.id,
               content: JSON.stringify(result),
             };
-          })
+          }),
         );
 
         const toolResults: MessageParam = {

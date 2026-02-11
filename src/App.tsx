@@ -64,18 +64,24 @@ export function App() {
   );
 
   return (
-    <div className="h-screen flex bg-crunch-cream font-body">
-      {/* Main chat area */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <ChatView
-          conversationId={conversationId}
-          onContextUpdate={handleContextUpdate}
-        />
-      </main>
+    <>
+      {/* Green velvet ambient background */}
+      <div className="room-ambience" />
 
-      {/* Corkboard sidebar */}
-      <CorkBoard preferences={preferences} restaurants={restaurants} />
-    </div>
+      {/* Console frame with thick mahogany border */}
+      <div className="console-frame">
+        {/* Main chat area */}
+        <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream">
+          <ChatView
+            conversationId={conversationId}
+            onContextUpdate={handleContextUpdate}
+          />
+        </main>
+
+        {/* Corkboard sidebar */}
+        <CorkBoard preferences={preferences} restaurants={restaurants} />
+      </div>
+    </>
   );
 }
 

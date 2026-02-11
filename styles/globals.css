@@ -9,6 +9,10 @@
   --color-crunch-cream: #fdf6ef;
   --color-crunch-cream-dark: #f5e6d3;
 
+  /* Velvet Green (outer frame) */
+  --color-crunch-velvet: #0d2b1d;
+  --color-crunch-velvet-light: #1a4d33;
+
   /* Dark Walnut */
   --color-crunch-walnut-50: #fdeee8;
   --color-crunch-walnut-100: #faded1;
@@ -48,18 +52,21 @@
   --color-crunch-orange-900: #2e1905;
   --color-crunch-orange-950: #201103;
 
-  /* Rich Mahogany */
-  --color-crunch-mahogany-50: #fcede8;
-  --color-crunch-mahogany-100: #f9dbd2;
-  --color-crunch-mahogany-200: #f4b7a4;
-  --color-crunch-mahogany-300: #ee9377;
-  --color-crunch-mahogany-400: #e96f49;
-  --color-crunch-mahogany-500: #e34a1c;
-  --color-crunch-mahogany-600: #b63c16;
-  --color-crunch-mahogany-700: #882d11;
-  --color-crunch-mahogany-800: #5b1e0b;
+  /* Rich Mahogany (darker tones from Velvet Spoon) */
+  --color-crunch-mahogany-50: #f9ebe6;
+  --color-crunch-mahogany-100: #f3d5cb;
+  --color-crunch-mahogany-200: #e6a996;
+  --color-crunch-mahogany-300: #d97d62;
+  --color-crunch-mahogany-400: #cc512e;
+  --color-crunch-mahogany-500: #b8401a;
+  --color-crunch-mahogany-600: #8e3214;
+  --color-crunch-mahogany-700: #5c2e1d;
+  --color-crunch-mahogany-800: #3e1e12;
   --color-crunch-mahogany-900: #2d0f06;
   --color-crunch-mahogany-950: #200a04;
+
+  /* Frame border color */
+  --color-crunch-frame: #3e1e12;
 
   /* Rosy Copper */
   --color-crunch-copper-50: #faeeeb;
