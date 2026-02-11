@@ -1,7 +1,7 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
-import { LocalMapDB } from "./Database";
+import { LocalMapDB } from "./databases/Database";
 
 /**
  * Init Chatbot, with Local Map Database
@@ -14,40 +14,44 @@ export const server = serve({
 
     "/api/chat/create": {
       async POST() {
-        const id = chatbot.DATABASE.createConversation();
-        return Response.json(id);
+        const conversation = await chatbot.DATABASE.createConversation();
+        return Response.json(conversation);
       },
     },
 
     "/api/chat/conversations": {
-      GET() {
-        const conversations: {
-          id: string;
-          preview: string;
-          messageCount: number;
-        }[] = [];
-        for (const id of chatbot.DATABASE.getAllConversations()) {
-          const messages = chatbot.DATABASE.getConversation(id);
-          const firstUserMsg = messages.find((m) => m.role === "user");
-          const preview = firstUserMsg
-            ? typeof firstUserMsg.content === "string"
+      async GET() {
+        const conversations = await chatbot.DATABASE.getAllConversations();
+
+        const result = await Promise.all(
+          conversations.map(async (conv) => {
+            const messages = await chatbot.DATABASE.getConversation(conv.id);
+            const firstUserMsg = messages.find((m) => m.role === "user");
+            const preview = firstUserMsg
               ? firstUserMsg.content.slice(0, 60)
-              : "..."
-            : "New conversation";
-          conversations.push({ id, preview, messageCount: messages.length });
-        }
-        return Response.json(conversations);
+              : "New conversation";
+            return {
+              id: conv.id,
+              createdAt: conv.createdAt,
+              preview,
+              messageCount: messages.length,
+            };
+          }),
+        );
+
+        return Response.json(result);
       },
     },
 
     "/api/chat/conversations/:id": {
-      GET(req) {
+      async GET(req) {
         const id = req.params.id;
-        const messages = chatbot.DATABASE.getConversation(id);
-        if (!messages) {
+        try {
+          const messages = await chatbot.DATABASE.getConversation(id);
+          return Response.json(messages);
+        } catch {
           return Response.json({ error: "Not found" }, { status: 404 });
         }
-        return Response.json(messages);
       },
     },
 
