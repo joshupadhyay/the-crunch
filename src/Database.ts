@@ -4,11 +4,11 @@ import { randomUUIDv7 } from "bun";
 export const CHATDATABASE: Map<string, MessageParam[]> = new Map();
 
 export interface IDatabase {
-  createConversation(): string;
+  createConversation(): Promise<string>;
 
-  getConversation(id: string): MessageParam[];
+  getConversation(id: string): Promise<MessageParam[]>;
 
-  getAllConversations(): string[];
+  getAllConversations(): Promise<string[]>;
 
   // this might be expensive to return the messages after a push?
   // Maybe just a confirmation of successful db transaction = more performant.
@@ -16,7 +16,7 @@ export interface IDatabase {
     id: string,
     role: "user" | "assistant",
     message: MessageParam["content"],
-  ): MessageParam[];
+  ): Promise<MessageParam[]>;
 
   // this is how you specify optional function in interface
   deleteConversation?(id: string): void;
@@ -25,13 +25,13 @@ export interface IDatabase {
 export class LocalMapDB implements IDatabase {
   CHATDATABASE: Map<string, MessageParam[]> = new Map();
 
-  createConversation(): string {
+  async createConversation() {
     const newConversationID = randomUUIDv7().toString();
     CHATDATABASE.set(newConversationID, []);
-    return newConversationID;
+    return await newConversationID;
   }
 
-  getConversation(id: string) {
+  async getConversation(id: string) {
     const messages = CHATDATABASE.get(id);
 
     if (!messages) {
@@ -44,16 +44,16 @@ export class LocalMapDB implements IDatabase {
    *
    * @returns string[] of all conversationIDs
    */
-  getAllConversations(): string[] {
-    return CHATDATABASE.keys().toArray();
+  async getAllConversations() {
+    return await CHATDATABASE.keys().toArray();
   }
 
-  pushMessage(
+  async pushMessage(
     id: string,
     role: "user" | "assistant",
     message: MessageParam["content"],
-  ): MessageParam[] {
-    const messages = this.getConversation(id);
+  ): Promise<MessageParam[]> {
+    const messages = await this.getConversation(id);
 
     messages?.push({ role: role, content: message });
 
