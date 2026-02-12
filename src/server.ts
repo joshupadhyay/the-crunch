@@ -58,40 +58,38 @@ export const server = serve({
 
     "/api/chat/send": {
       async POST(req) {
-        const { conversationId, message } = await req.json();
+        const body = await req.json();
 
-        const readable = new ReadableStream({
+        const { message, conversationId } = body;
+
+        const stream = new ReadableStream({
+          // we create a new readable stream
+
+          // start is to start the stream. We use the stream controller to grab chunks from the streamMessage
           async start(controller) {
-            const encoder = new TextEncoder();
-            try {
-              for await (const event of chatbot.streamMessage(
-                conversationId,
-                message,
-              )) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-                );
-              }
-            } catch (err: any) {
-              console.error("[send] Stream error:", err);
+            for await (const chunk of chatbot.streamMessage(
+              { role: "user", content: message }, // take message from user and pass it to ChatBot
+              conversationId,
+            )) {
+              // We take the output from the chatbot, and stringify it...
               controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`,
-                ),
+                new TextEncoder().encode(JSON.stringify(chunk) + "\n"),
               );
-            } finally {
-              controller.close();
             }
+
+            // no more chunks (response is complete, we close the controller)
+            controller.close();
           },
         });
 
-        return new Response(readable, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          },
+        return new Response(stream, {
+          headers: { "Content-Type": "text/event-stream" },
         });
+
+        /**
+         * We are STREAMING - we can't just return an object. But Response can accept a streaming object
+         */
+        // return await chatbot.streamMessage(message, conversationId);
       },
     },
   },

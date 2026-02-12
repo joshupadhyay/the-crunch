@@ -1,22 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
-import { SYSTEM_PROMPT } from "./system-prompt";
-import { TOOLS, executeTool } from "./tools";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
+import { unstable_v2_createSession } from "@anthropic-ai/claude-agent-sdk";
+import { executeTool, TOOLS } from "./tools";
 
-export interface StreamEvent {
-  type: "text" | "tool_start" | "tool_result" | "done" | "error";
-  text?: string;
-  name?: string;
-  message?: string;
-}
-
-// TODO
-// What about tool calls? is this stored as JSONB? Is it better to be as text?
-// You will come back, this will bite you in the ass for sure...
 /** Convert domain Message[] to Anthropic SDK MessageParam[] */
-
 function toMessageParams(messages: Message[]): MessageParam[] {
   return messages.map((m) => {
     let content: MessageParam["content"];
@@ -38,9 +27,9 @@ export class AnthropicChatBot {
   DATABASE: IDatabase;
   readonly client: Anthropic;
 
-  params: Pick<MessageCreateParams, "max_tokens" | "model"> = {
+  anthropicApiParams: Pick<MessageCreateParams, "max_tokens" | "model"> = {
     max_tokens: 4096,
-    // SAVE MONEY – DO NOT CHANGE THE MODEL TYPE
+    // SAVE MONEY – DO NOT CHANGE THE MODEL TYPE
     model: "claude-haiku-4-5-20251001",
   };
 
@@ -51,105 +40,166 @@ export class AnthropicChatBot {
     });
   }
 
-  /**
-   * Generator function responsible for handling streaming of AI messages, and tool use
-   *
-   * Generator is like 'streaming' for the function itself:
-   * It allows us to return streamed messages as they come in, and we forward them to the client
-   *
-   * async means we wait for streamed messages –
-   * the while ensures we keep waiting for a response, or until a final message.
-   *
-   * Uses a generator function
-   * @param conversationId
-   * @param userMessage
-   */
-  async *streamMessage(
-    conversationId: string,
-    userMessage: string,
-  ): AsyncGenerator<StreamEvent> {
-    // Store user message and build SDK messages
-    // (every AI message requires a user message to start!)
-    await this.DATABASE.pushMessage(conversationId, "user", userMessage);
-    const domainMessages = await this.DATABASE.getConversation(conversationId);
-    const messages: MessageParam[] = toMessageParams(domainMessages);
+  async createConversation() {
+    const conversationCreate = await this.DATABASE.createConversation();
 
-    let continueLoop = true;
+    return conversationCreate;
+  }
 
-    while (continueLoop) {
-      const stream = this.client.messages.stream({
-        ...this.params,
-        system: SYSTEM_PROMPT,
+  async getMessages(conversationId: string) {
+    const messages = await this.DATABASE.getConversation(conversationId);
+
+    return messages;
+  }
+
+  async *streamMessage(message: Message, conversationId: string) {
+    // Save the user's message to DB
+    await this.DATABASE.pushMessage(
+      conversationId,
+      message.role,
+      message.content,
+    );
+
+    let stopReason: string | null = "tool_use";
+
+    // TOOL USE LOOP: keep calling the API until Claude stops requesting tools
+    while (stopReason === "tool_use") {
+      const messages = await this.DATABASE.getConversation(conversationId);
+
+      const stream = await this.client.messages.create({
+        messages: toMessageParams(messages),
+        stream: true,
         tools: TOOLS,
-        messages,
+        ...this.anthropicApiParams,
       });
 
-      // Stream text deltas to the client
+      // Track state for this stream iteration
+      let textContent = "";
+      const toolCalls: { name: string; id: string; input: string }[] = [];
+      let currentToolName = "";
+      let currentToolId = "";
+      let currentToolInput = "";
+      stopReason = null;
+
       for await (const event of stream) {
+        // yield* delegates parsed chunks to the frontend (text, tool_use_start, etc.)
+        yield* parseMessageStreamEvents(event);
+
+        // ALSO track tool call info for the loop
+        // We do this here because parseMessageStreamEvents is sync and can't execute tools
         if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
+          event.type === "content_block_start" &&
+          event.content_block.type === "tool_use"
         ) {
-          yield { type: "text", text: event.delta.text };
+          // A tool call is starting — capture name + id
+          currentToolName = event.content_block.name;
+          currentToolId = event.content_block.id;
+          currentToolInput = "";
+        } else if (event.type === "content_block_delta") {
+          if (event.delta.type === "text_delta") {
+            textContent += event.delta.text;
+          } else if (event.delta.type === "input_json_delta") {
+            // Accumulate partial JSON pieces into full input
+            currentToolInput += event.delta.partial_json;
+          }
+        } else if (event.type === "content_block_stop" && currentToolName) {
+          // Tool block finished — save the accumulated tool call
+          toolCalls.push({
+            name: currentToolName,
+            id: currentToolId,
+            input: currentToolInput,
+          });
+          currentToolName = "";
+          currentToolId = "";
+          currentToolInput = "";
+        } else if (event.type === "message_delta") {
+          // This tells us WHY Claude stopped: "tool_use" or "end_turn"
+          stopReason = event.delta.stop_reason;
         }
       }
 
-      // This informs us that the AI response has 'ended'.
+      // If Claude wants tool results, execute them and save to DB for next iteration
+      if (stopReason === "tool_use" && toolCalls.length > 0) {
+        // Build the assistant message content blocks (text + tool_use)
+        const assistantContent: any[] = [];
+        if (textContent) {
+          assistantContent.push({ type: "text", text: textContent });
+        }
+        for (const tc of toolCalls) {
+          assistantContent.push({
+            type: "tool_use",
+            id: tc.id,
+            name: tc.name,
+            input: JSON.parse(tc.input || "{}"),
+          });
+        }
 
-      const finalMessage = await stream.finalMessage();
-
-      // Store assistant response as serialized string
-      const serialized = serializeContent(finalMessage.content);
-      await this.DATABASE.pushMessage(conversationId, "assistant", serialized);
-      // Also push to local messages array for the SDK loop
-      messages.push({ role: "assistant", content: finalMessage.content });
-
-      // If we use a tool, we want to stop streaming to switch for Tool Use
-      // We rely on Anthropic's SDK here, to stop for tool use
-      if (finalMessage.stop_reason === "tool_use") {
-        const toolUseBlocks = finalMessage.content.filter(
-          (block) => block.type === "tool_use",
+        // Save assistant message with tool_use blocks
+        await this.DATABASE.pushMessage(
+          conversationId,
+          "assistant",
+          JSON.stringify(assistantContent),
         );
 
-        // Notify client about tool execution
-        const toolNames = toolUseBlocks
-          .map((t) => (t.type === "tool_use" ? t.name : ""))
-          .filter(Boolean)
-          .join(", ");
-        yield { type: "tool_start", name: toolNames };
+        // Execute each tool and collect results
+        const toolResults: any[] = [];
+        for (const tc of toolCalls) {
+          const result = await executeTool(
+            tc.name,
+            JSON.parse(tc.input || "{}"),
+          );
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: JSON.stringify(result),
+          });
+        }
 
-        // Execute all tool calls
-        const toolResultContent = await Promise.all(
-          toolUseBlocks.map(async (toolUse) => {
-            if (toolUse.type !== "tool_use") return toolUse as any;
-            const result = await executeTool(
-              toolUse.name,
-              toolUse.input as Record<string, unknown>,
-            );
-            return {
-              type: "tool_result" as const,
-              tool_use_id: toolUse.id,
-              content: JSON.stringify(result),
-            };
-          }),
-        );
-
-        // Store tool results and push to SDK messages
+        // Save tool results as a "user" message (Anthropic API requires tool_result in user role)
         await this.DATABASE.pushMessage(
           conversationId,
           "user",
-          JSON.stringify(toolResultContent),
+          JSON.stringify(toolResults),
         );
-        messages.push({ role: "user", content: toolResultContent });
 
-        yield { type: "tool_result" };
-        // Loop continues — next iteration streams the post-tool response
-      } else {
-        continueLoop = false;
+        // Loop continues → new API call with updated messages including tool results
       }
     }
-
-    // end of expecting AI messages (stream) or tool use finished.
-    yield { type: "done" };
   }
 }
+
+function* parseMessageStreamEvents(event: Anthropic.RawMessageStreamEvent) {
+  switch (event.type) {
+    case "message_start":
+      console.log('message starting"');
+      break;
+
+    case "content_block_delta":
+      if (event.delta.type === "text_delta") {
+        yield { type: "text", text: event.delta };
+      } else if (event.delta.type === "input_json_delta") {
+        yield { type: "tool_input", partial_json: event.delta.partial_json };
+      }
+      break;
+    case "content_block_start":
+      if (event.content_block.type === "tool_use") {
+        // a tool call is starting — you get the tool name and id here
+
+        yield {
+          type: "tool_use_start",
+          name: event.content_block.name,
+          id: event.content_block.id,
+        };
+      }
+      break;
+    case "content_block_stop":
+      // a tool call is ending
+      yield {
+        type: "tool_use_stop",
+      };
+
+      break;
+  }
+}
+
+// "message_start" | "message_delta" | "message_stop" | "content_block_start" | "content_block_delta" | "content_block_stop"
