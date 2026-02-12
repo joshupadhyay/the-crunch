@@ -7,6 +7,10 @@ interface Message {
   content: string;
 }
 
+/**
+ * Andrew if you're reading this, I really care much for styling. Claude did in fact do this.
+ */
+
 interface ChatViewProps {
   conversationId: string | null;
   onContextUpdate: (ctx: {
