@@ -213,7 +213,7 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
           </div>
         )}
       </div>
-      /** Claude moved the chatinput into a separate component */
+      {/** Claude moved the chatinput into a separate component */}
       {/* Input */}
       <ChatInput
         value={input}
