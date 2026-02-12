@@ -20,6 +20,7 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUsingTool, setIsUsingTool] = useState<string | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -76,7 +77,16 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
 
       for (const line of lines) {
         const parsed = JSON.parse(line);
-        assistantText += parsed.text.text;
+
+        if (parsed.type === "text") {
+          assistantText += parsed.text.text;
+        } else if (parsed.type === "tool_use_start") {
+          // show tool use as it happens...
+          assistantText += `\n\n*Tool Use: ${parsed.name}...*\n\n`;
+          setIsUsingTool(assistantText);
+        } else if (parsed.type === "tool_use_stop") {
+          setIsUsingTool(undefined);
+        }
       }
 
       // replace the last message with updated text — new array, new object
