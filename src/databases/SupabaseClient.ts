@@ -47,6 +47,17 @@ export class SupabaseDB implements IDatabase {
   }
 
   async getConversation(id: string): Promise<Message[]> {
+    // Verify the conversation exists first (mirrors LocalMapDB behaviour)
+    const { data: conv, error: convError } = await this.client
+      .from("conversations")
+      .select("id")
+      .eq("id", id)
+      .single();
+
+    if (convError || !conv) {
+      throw new Error(`Conversation ${id} does not exist.`);
+    }
+
     const { data, error } = await this.client
       .from("messages")
       .select("role, content")
