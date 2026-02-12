@@ -14,7 +14,8 @@ export type Conversation = {
 export interface IDatabase {
   createConversation(): Promise<Conversation>;
 
-  getConversation(id: string): Promise<Message[]>;
+  /** @returns Message[] for entire conversation */
+  getConversation(conversationId: string): Promise<Message[]>;
 
   getAllConversations(): Promise<Conversation[]>;
 
@@ -37,10 +38,11 @@ export class LocalMapDB implements IDatabase {
     return { id, createdAt };
   }
 
-  async getConversation(id: string): Promise<Message[]> {
-    const entry = this.store.get(id);
+  /** @returns Message[] for entire conversation */
+  async getConversation(conversationId: string): Promise<Message[]> {
+    const entry = this.store.get(conversationId);
     if (!entry) {
-      throw new Error(`Conversation ${id} does not exist.`);
+      throw new Error(`Conversation ${conversationId} does not exist.`);
     }
     return entry.messages;
   }

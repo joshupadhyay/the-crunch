@@ -15,33 +15,8 @@ interface ChatViewProps {
   }) => void;
 }
 
-function extractContext(text: string): {
-  cleanText: string;
-  context: { preferences?: Preference[]; restaurants?: Restaurant[] } | null;
-} {
-  const contextMatch = text.match(/<!--context\s*([\s\S]*?)-->/);
-  if (!contextMatch) return { cleanText: text, context: null };
-
-  const cleanText = text.replace(/<!--context\s*[\s\S]*?-->/, "").trim();
-  try {
-    const context = JSON.parse(contextMatch[1]);
-    return { cleanText, context };
-  } catch {
-    return { cleanText, context: null };
-  }
-}
-
-function cleanStreamingText(text: string): string {
-  // Hide incomplete <!--context blocks while streaming
-  const idx = text.lastIndexOf("<!--context");
-  if (idx !== -1 && !text.includes("-->", idx)) {
-    return text.substring(0, idx).trim();
-  }
-  // Clean any complete context blocks too
-  return text.replace(/<!--context\s*[\s\S]*?-->/g, "").trim();
-}
-
 export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
+  // stores the entire conversation
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,98 +31,62 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
     inputRef.current?.focus();
   }, [conversationId]);
 
+  // TODO: implement sendMessage — see confusions/streaming-howto.md
   const sendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || !conversationId || isLoading) return;
+    // append latest input to messages.. modifying like this to avoid adjusting messages inplace
 
-    const userMessage: Message = { role: "user", content: trimmed };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    const latestMsg: Message = { role: "user", content: input };
+
+    setMessages([...messages, latestMsg]);
+    setInput(""); // clear input after pushing
+
+    // now UI is loading as we wait for response
     setIsLoading(true);
 
-    try {
-      const res = await fetch("/api/chat/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, message: trimmed }),
-      });
+    const response = await fetch("/api/chat/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: input,
+        conversationId: conversationId,
+      }),
+    });
 
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
 
-      // Add empty assistant message to fill progressively
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    let assistantText = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+    // set empty chatbot message. We'll be updating this with each chunk as they come in
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-        buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      // read chunk by chunk as it comes in
+      const { done, value } = await reader?.read();
 
-        // Parse SSE events (separated by double newlines)
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
+      // while (true) because we don't know how many chunks. but we know we will get done message
+      if (done) break;
 
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(part.slice(6));
+      // parse the stringified JSON. we also need to grab the text.text, since that's what chunks send
+      const raw = decoder.decode(value);
+      const lines = raw.split("\n").filter((line) => line.trim());
 
-            if (event.type === "text") {
-              fullText += event.text;
-              // Hide partial <!--context blocks during streaming
-              const display = cleanStreamingText(fullText);
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: display,
-                };
-                return updated;
-              });
-            } else if (event.type === "error") {
-              console.error("[Crunch] Server error:", event.message);
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: `Something went wrong: ${event.message}`,
-                };
-                return updated;
-              });
-              setIsLoading(false);
-            } else if (event.type === "done") {
-              // Final extraction with context
-              const { cleanText, context } = extractContext(fullText);
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: cleanText,
-                };
-                return updated;
-              });
-              if (context) onContextUpdate(context);
-            }
-          } catch {
-            // Skip malformed events
-          }
-        }
+      // if multiple chunks, we need to split by `\n`, which the server sends as newline between chunks
+      // we parse each one, then add it to the text
+
+      for (const line of lines) {
+        const parsed = JSON.parse(line);
+        assistantText += parsed.text.text;
       }
-    } catch {
+
+      // replace the last message with updated text — new array, new object
       setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Bummer — couldn't reach the kitchen. Try again?",
-        },
+        ...prev.slice(0, -1),
+        { role: "assistant", content: assistantText },
       ]);
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
     }
+
+    setIsLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

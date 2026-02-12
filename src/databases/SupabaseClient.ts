@@ -46,11 +46,12 @@ export class SupabaseDB implements IDatabase {
     return data.map((row) => ({ id: row.id, createdAt: row.created_at }));
   }
 
-  async getConversation(id: string): Promise<Message[]> {
+  /** @returns Message[] for entire conversation */
+  async getConversation(conversationId: string): Promise<Message[]> {
     const { data, error } = await this.client
       .from("messages")
       .select("role, content")
-      .eq("conversation_id", id)
+      .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
