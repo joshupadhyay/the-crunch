@@ -1,52 +1,45 @@
 import type { Tool } from "@anthropic-ai/sdk/resources/messages";
+import Exa from "exa-js";
+
+const exa = new Exa(process.env.EXA_API_KEY);
 
 // Restaurant search tool definition for Claude's tool use
 export const TOOLS: Tool[] = [
   {
-    name: "search_restaurants",
+    name: "web_search",
     description:
-      "Search the curated local restaurant database for NYC restaurants and bars. Fast and always available. Use this for quick recommendations.",
+      "Search the web for real-time restaurant details, reviews, hours, and neighborhood info. Use when the user wants to verify specifics about a restaurant or needs current information not in the local database. Use also for guides / reviews that recommend this place to give the user character. Requires EXA_API_KEY.",
     input_schema: {
       type: "object" as const,
       properties: {
-        cuisine: {
+        restaurant_name: {
           type: "string",
           description:
-            "Type of cuisine (e.g., Italian, Japanese, French, Mexican, American, Cocktail Bar)",
+            "Name of a specific restaurant to look up (e.g., 'L\\'Artusi', 'Dhamaka')",
         },
-        neighborhood: {
+        location: {
           type: "string",
           description:
-            "Neighborhood or area (e.g., West Village, Williamsburg, Lower East Side)",
+            "Neighborhood or area to narrow the search (e.g., 'West Village', 'Lower East Side', 'NYC')",
         },
-        price_range: {
-          type: "string",
-          enum: ["$", "$$", "$$$", "$$$$"],
-          description: "Price range from $ (budget) to $$$$ (fine dining)",
-        },
-        occasion: {
+        query: {
           type: "string",
           description:
-            "Type of occasion (e.g., date night, group dinner, casual drinks, celebration)",
+            "Free-form search for broader discovery like curated lists, neighborhood guides, or cuisine roundups (e.g., 'best new restaurants Lower East Side 2025', 'Eater NY date night guide')",
         },
-        dietary: {
+        info_type: {
           type: "string",
+          enum: ["reviews", "hours", "neighborhood", "general"],
           description:
-            "Dietary restrictions or preferences (e.g., vegetarian, vegan, gluten-free)",
-        },
-        vibe: {
-          type: "string",
-          description:
-            "Desired atmosphere (e.g., romantic, lively, intimate, trendy, classic)",
+            "What kind of information to focus on. Defaults to general.",
         },
       },
-      required: ["cuisine"],
     },
   },
   {
     name: "search_opentable",
     description:
-      "Search OpenTable for real-time restaurant data including availability, reviews, and ratings. Use this when the user wants live booking info, broader search results, or restaurants not in the local database. Requires APIFY_API_TOKEN to be configured.",
+      "Search OpenTable for real-time restaurant data including availability, reviews, and ratings. Use this when the user wants live booking info and availability. Requires APIFY_API_TOKEN to be configured.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -121,7 +114,11 @@ const RESTAURANT_DB = [
     rating: 4.5,
     description:
       "Chef Kwame Onwuachi's vibrant restaurant blending Afro-Caribbean and American flavors. A celebration on a plate.",
-    highlights: ["James Beard winner", "Tasting menu available", "Live music nights"],
+    highlights: [
+      "James Beard winner",
+      "Tasting menu available",
+      "Live music nights",
+    ],
     dietary: ["gluten-free options"],
   },
   {
@@ -193,7 +190,11 @@ const RESTAURANT_DB = [
     rating: 4.9,
     description:
       "Two-Michelin-star Korean tasting menu in an intimate setting. Each course tells a story. Reservations drop monthly.",
-    highlights: ["2 Michelin stars", "Tasting menu", "Intimate 14-seat counter"],
+    highlights: [
+      "2 Michelin stars",
+      "Tasting menu",
+      "Intimate 14-seat counter",
+    ],
     dietary: ["gluten-free options"],
   },
   {
@@ -265,7 +266,11 @@ const RESTAURANT_DB = [
     rating: 4.6,
     description:
       "Danny Meyer's beloved tavern. The front tavern room is walk-in only with a more casual menu. Back dining room for special occasions.",
-    highlights: ["Walk-in tavern room", "Seasonal menu", "Danny Meyer restaurant"],
+    highlights: [
+      "Walk-in tavern room",
+      "Seasonal menu",
+      "Danny Meyer restaurant",
+    ],
     dietary: ["vegetarian-friendly", "gluten-free options"],
   },
 ];
@@ -286,15 +291,14 @@ export function searchRestaurants(params: {
     results = results.filter(
       (r) =>
         r.cuisine.toLowerCase().includes(cuisine) ||
-        r.description.toLowerCase().includes(cuisine)
+        r.description.toLowerCase().includes(cuisine),
     );
   }
 
   if (params.neighborhood) {
     const neighborhood = params.neighborhood.toLowerCase();
-    results = results.filter(
-      (r) =>
-        r.neighborhood.toLowerCase().includes(neighborhood)
+    results = results.filter((r) =>
+      r.neighborhood.toLowerCase().includes(neighborhood),
     );
   }
 
@@ -305,7 +309,7 @@ export function searchRestaurants(params: {
   if (params.dietary) {
     const dietary = params.dietary.toLowerCase();
     results = results.filter((r) =>
-      r.dietary.some((d) => d.toLowerCase().includes(dietary))
+      r.dietary.some((d) => d.toLowerCase().includes(dietary)),
     );
   }
 
@@ -314,7 +318,7 @@ export function searchRestaurants(params: {
     results = results.filter(
       (r) =>
         r.vibe.toLowerCase().includes(vibe) ||
-        r.description.toLowerCase().includes(vibe)
+        r.description.toLowerCase().includes(vibe),
     );
   }
 
@@ -368,7 +372,7 @@ export async function searchOpenTable(params: {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(actorInput),
-      }
+      },
     );
 
     if (!res.ok) {
@@ -380,20 +384,25 @@ export async function searchOpenTable(params: {
 
     const data = await res.json();
     // Return first 8 results, trimmed to relevant fields
-    const results = (Array.isArray(data) ? data : []).slice(0, 8).map((r: any) => ({
-      name: r.name || r.restaurantName,
-      cuisine: r.cuisine || r.cuisineType || r.category,
-      neighborhood: r.neighborhood || r.area,
-      priceRange: r.priceRange || r.price,
-      rating: r.rating || r.overallRating,
-      reviewCount: r.reviewCount || r.totalReviews,
-      description: r.description || r.tagline,
-      bookingSlots: r.bookingSlots || r.availableSlots,
-      address: r.address,
-    }));
+    const results = (Array.isArray(data) ? data : [])
+      .slice(0, 8)
+      .map((r: any) => ({
+        name: r.name || r.restaurantName,
+        cuisine: r.cuisine || r.cuisineType || r.category,
+        neighborhood: r.neighborhood || r.area,
+        priceRange: r.priceRange || r.price,
+        rating: r.rating || r.overallRating,
+        reviewCount: r.reviewCount || r.totalReviews,
+        description: r.description || r.tagline,
+        bookingSlots: r.bookingSlots || r.availableSlots,
+        address: r.address,
+      }));
 
     if (results.length === 0) {
-      return { message: "No OpenTable results found for this search. Try broader criteria or use search_restaurants for local picks." };
+      return {
+        message:
+          "No OpenTable results found for this search. Try broader criteria or use search_restaurants for local picks.",
+      };
     }
 
     return results;
@@ -404,16 +413,67 @@ export async function searchOpenTable(params: {
   }
 }
 
+// Exa web search for real-time restaurant info
+export async function searchExa(params: {
+  restaurant_name?: string;
+  location?: string;
+  query?: string;
+  info_type?: "reviews" | "hours" | "neighborhood" | "general";
+}): Promise<unknown> {
+  const key = process.env.EXA_API_KEY;
+  if (!key) {
+    return {
+      error: "Web search is not configured. EXA_API_KEY is not set.",
+    };
+  }
+
+  // Build the search query from structured fields or free-form query
+  let searchQuery: string;
+  if (params.restaurant_name) {
+    // Specific restaurant lookup
+    const parts = [params.restaurant_name];
+    if (params.location) parts.push(params.location);
+    const focus = params.info_type ?? "general";
+    if (focus !== "general") parts.push(focus);
+    searchQuery = parts.join(" ") + " restaurant NYC";
+  } else if (params.query) {
+    // Free-form discovery search
+    searchQuery = params.query;
+  } else {
+    return { error: "Provide either restaurant_name or query." };
+  }
+
+  try {
+    const res = await exa.search(searchQuery, {
+      type: "auto",
+      numResults: 5,
+      contents: {
+        highlights: {
+          maxCharacters: 2000,
+        },
+      },
+    });
+
+    return res.results;
+  } catch (err: any) {
+    return { error: `Exa search failed: ${err.message}` };
+  }
+}
+
 // Unified tool dispatcher
 export async function executeTool(
   name: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
 ): Promise<unknown> {
   switch (name) {
     case "search_restaurants":
-      return searchRestaurants(input as Parameters<typeof searchRestaurants>[0]);
+      return searchRestaurants(
+        input as Parameters<typeof searchRestaurants>[0],
+      );
     case "search_opentable":
       return searchOpenTable(input as Parameters<typeof searchOpenTable>[0]);
+    case "web_search":
+      return searchExa(input as Parameters<typeof searchExa>[0]);
     default:
       return { error: `Unknown tool: ${name}` };
   }
