@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { IDatabase } from "./Database";
+import type { MessageParam } from "@anthropic-ai/sdk/resources";
+import type { IDatabase, Message } from "./databases/Database";
 import { SYSTEM_PROMPT } from "./system-prompt";
 import { TOOLS, executeTool } from "./tools";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
@@ -11,13 +12,36 @@ export interface StreamEvent {
   message?: string;
 }
 
+// TODO
+// What about tool calls? is this stored as JSONB? Is it better to be as text?
+// You will come back, this will bite you in the ass for sure...
+/** Convert domain Message[] to Anthropic SDK MessageParam[] */
+
+function toMessageParams(messages: Message[]): MessageParam[] {
+  return messages.map((m) => {
+    let content: MessageParam["content"];
+    try {
+      content = JSON.parse(m.content);
+    } catch {
+      content = m.content;
+    }
+    return { role: m.role, content };
+  });
+}
+
+/** Serialize SDK content to a string for storage */
+function serializeContent(content: MessageParam["content"]): string {
+  return typeof content === "string" ? content : JSON.stringify(content);
+}
+
 export class AnthropicChatBot {
   DATABASE: IDatabase;
   readonly client: Anthropic;
 
   params: Pick<MessageCreateParams, "max_tokens" | "model"> = {
     max_tokens: 4096,
-    model: "claude-sonnet-4-5-20250929",
+    // SAVE MONEY – DO NOT CHANGE THE MODEL TYPE
+    model: "claude-haiku-4-5-20251001",
   };
 
   constructor(database: IDatabase) {
@@ -31,13 +55,10 @@ export class AnthropicChatBot {
     conversationId: string,
     userMessage: string,
   ): AsyncGenerator<StreamEvent> {
-    const messages = this.DATABASE.getConversation(conversationId);
-    if (!messages) {
-      yield { type: "error", message: "Conversation ID not found" };
-      return;
-    }
-
-    messages.push({ role: "user", content: userMessage });
+    // Store user message and build SDK messages
+    await this.DATABASE.pushMessage(conversationId, "user", userMessage);
+    const domainMessages = await this.DATABASE.getConversation(conversationId);
+    const messages: MessageParam[] = toMessageParams(domainMessages);
 
     let continueLoop = true;
 
@@ -61,12 +82,11 @@ export class AnthropicChatBot {
 
       const finalMessage = await stream.finalMessage();
 
-      // Add assistant response to conversation history
-      this.DATABASE.pushMessage(
-        conversationId,
-        "assistant",
-        finalMessage.content,
-      );
+      // Store assistant response as serialized string
+      const serialized = serializeContent(finalMessage.content);
+      await this.DATABASE.pushMessage(conversationId, "assistant", serialized);
+      // Also push to local messages array for the SDK loop
+      messages.push({ role: "assistant", content: finalMessage.content });
 
       if (finalMessage.stop_reason === "tool_use") {
         const toolUseBlocks = finalMessage.content.filter(
@@ -80,7 +100,7 @@ export class AnthropicChatBot {
           .join(", ");
         yield { type: "tool_start", name: toolNames };
 
-        // Execute all tool calls (some may be async like OpenTable)
+        // Execute all tool calls
         const toolResultContent = await Promise.all(
           toolUseBlocks.map(async (toolUse) => {
             if (toolUse.type !== "tool_use") return toolUse as any;
@@ -96,7 +116,14 @@ export class AnthropicChatBot {
           }),
         );
 
-        this.DATABASE.pushMessage(conversationId, "user", toolResultContent);
+        // Store tool results and push to SDK messages
+        await this.DATABASE.pushMessage(
+          conversationId,
+          "user",
+          JSON.stringify(toolResultContent),
+        );
+        messages.push({ role: "user", content: toolResultContent });
+
         yield { type: "tool_result" };
         // Loop continues — next iteration streams the post-tool response
       } else {

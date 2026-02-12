@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatView } from "./ChatView";
 import { CorkBoard } from "./CorkBoard";
 import "./index.css";
@@ -20,11 +20,13 @@ export function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [boardExpanded, setBoardExpanded] = useState(false);
+  const hasAutoExpanded = useRef(false);
 
   useEffect(() => {
     async function init() {
       const res = await fetch("/api/chat/create", { method: "POST" });
-      const id: string = await res.json();
+      const { id } = await res.json();
       setConversationId(id);
     }
     init();
@@ -58,6 +60,11 @@ export function App() {
           }
           return merged;
         });
+        // Auto-expand board on first restaurant suggestion
+        if (!hasAutoExpanded.current) {
+          hasAutoExpanded.current = true;
+          setBoardExpanded(true);
+        }
       }
     },
     []
@@ -79,7 +86,12 @@ export function App() {
         </main>
 
         {/* Corkboard sidebar */}
-        <CorkBoard preferences={preferences} restaurants={restaurants} />
+        <CorkBoard
+          preferences={preferences}
+          restaurants={restaurants}
+          isExpanded={boardExpanded}
+          onToggle={() => setBoardExpanded((prev) => !prev)}
+        />
       </div>
     </>
   );
