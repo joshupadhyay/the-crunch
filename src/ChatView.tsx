@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Preference, Restaurant } from "./App";
+import { ChatInput } from "./components/ChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -103,13 +104,6 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
     setIsLoading(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
   if (!conversationId) {
     return (
       <div className="flex-1 flex items-center justify-center text-crunch-khaki-600">
@@ -129,7 +123,6 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
           Let's have a time!
         </p>
       </header>
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-crunch-cream">
         {messages.length === 0 ? (
@@ -220,42 +213,15 @@ export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
           </div>
         )}
       </div>
-
+      /** Claude moved the chatinput into a separate component */
       {/* Input */}
-      <div className="px-4 py-3 bg-crunch-cream border-t-2 border-crunch-walnut-200">
-        <div className="max-w-2xl mx-auto flex gap-2 items-end">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="What are you in the mood for?"
-            rows={1}
-            className="flex-1 resize-none rounded-xl border-2 border-crunch-walnut-200 bg-white px-4 py-2.5 text-[15px] text-crunch-walnut-900 placeholder:text-crunch-khaki-400 focus:outline-none focus:border-crunch-walnut-500 transition-colors min-h-10 max-h-32 font-body"
-            style={{ fieldSizing: "content" } as React.CSSProperties}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            className="shrink-0 w-10 h-10 rounded-xl bg-crunch-walnut-600 text-white flex items-center justify-center hover:bg-crunch-walnut-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            aria-label="Send message"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={sendMessage}
+        isLoading={isLoading}
+        inputRef={inputRef}
+      />
     </div>
   );
 }
