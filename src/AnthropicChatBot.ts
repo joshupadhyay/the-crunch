@@ -51,11 +51,25 @@ export class AnthropicChatBot {
     });
   }
 
+  /**
+   * Generator function responsible for handling streaming of AI messages, and tool use
+   *
+   * Generator is like 'streaming' for the function itself:
+   * It allows us to return streamed messages as they come in, and we forward them to the client
+   *
+   * async means we wait for streamed messages –
+   * the while ensures we keep waiting for a response, or until a final message.
+   *
+   * Uses a generator function
+   * @param conversationId
+   * @param userMessage
+   */
   async *streamMessage(
     conversationId: string,
     userMessage: string,
   ): AsyncGenerator<StreamEvent> {
     // Store user message and build SDK messages
+    // (every AI message requires a user message to start!)
     await this.DATABASE.pushMessage(conversationId, "user", userMessage);
     const domainMessages = await this.DATABASE.getConversation(conversationId);
     const messages: MessageParam[] = toMessageParams(domainMessages);
@@ -80,6 +94,8 @@ export class AnthropicChatBot {
         }
       }
 
+      // This informs us that the AI response has 'ended'.
+
       const finalMessage = await stream.finalMessage();
 
       // Store assistant response as serialized string
@@ -88,6 +104,8 @@ export class AnthropicChatBot {
       // Also push to local messages array for the SDK loop
       messages.push({ role: "assistant", content: finalMessage.content });
 
+      // If we use a tool, we want to stop streaming to switch for Tool Use
+      // We rely on Anthropic's SDK here, to stop for tool use
       if (finalMessage.stop_reason === "tool_use") {
         const toolUseBlocks = finalMessage.content.filter(
           (block) => block.type === "tool_use",
@@ -131,6 +149,7 @@ export class AnthropicChatBot {
       }
     }
 
+    // end of expecting AI messages (stream) or tool use finished.
     yield { type: "done" };
   }
 }

@@ -6,6 +6,14 @@ const exa = new Exa(process.env.EXA_API_KEY);
 // Restaurant search tool definition for Claude's tool use
 export const TOOLS: Tool[] = [
   {
+    name: "determine_date",
+    description:
+      "Use this tool to determine the current date. Use this to determine the current date, as well as what the user means by 'next Friday', etc. This will always current the current date and time in UTC. Assume the user is in EST time (NYC). Mention this and use this date for reference.",
+    input_schema: {
+      type: "object" as const,
+    },
+  },
+  {
     name: "web_search",
     description:
       "Search the web for real-time restaurant details, reviews, hours, and neighborhood info. Use when the user wants to verify specifics about a restaurant or needs current information not in the local database. Use also for guides / reviews that recommend this place to give the user character. Requires EXA_API_KEY.",
@@ -275,6 +283,16 @@ const RESTAURANT_DB = [
   },
 ];
 
+/**
+ *
+ * @returns current datetime, ISO format
+ */
+export function determineDate() {
+  const todayISO = new Date().toISOString();
+
+  return todayISO;
+}
+
 // Search function that filters the restaurant DB
 export function searchRestaurants(params: {
   cuisine?: string;
@@ -474,6 +492,8 @@ export async function executeTool(
       return searchOpenTable(input as Parameters<typeof searchOpenTable>[0]);
     case "web_search":
       return searchExa(input as Parameters<typeof searchExa>[0]);
+    case "determine_date":
+      return determineDate();
     default:
       return { error: `Unknown tool: ${name}` };
   }
