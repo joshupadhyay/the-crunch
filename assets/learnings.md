@@ -47,3 +47,14 @@ Claude uses the description to call the tool as necessary. Tools can also specif
 ```
 
 There's also an OpenTable integration or sorts, which I plan for direct bookings. I'd also like to explore Browserbase's Stagehand tool to bypass these API calls and have Claude check information and see the web directly!
+
+
+### My favorite tool: 
+
+So far, my favorite tool is giving Claude access to the actual date and time. It's so easy, with a simple `new Date().toISOString()`! I didn't think about this earlier... now at least Claude can derive what I mean by "next Friday".
+
+(This bot is intended for NYC, so implicitly I've told claude to convert to EST). 
+
+
+
+## Questions left to answer:
