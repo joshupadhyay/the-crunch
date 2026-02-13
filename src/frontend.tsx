@@ -10,7 +10,7 @@ import "./index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { ChatView } from "./ChatView";
 import { AppLayout } from "./components/AppLayout";
 import { LoginPage } from "./components/LoginPage";
@@ -22,10 +22,11 @@ const app = (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/chat/new" replace />} />
           <Route
             path="chat/:conversationId"
             element={<ChatView onContextUpdate={() => {}} />}
-          ></Route>
+          />
         </Route>
       </Routes>
     </BrowserRouter>

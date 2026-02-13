@@ -170,7 +170,6 @@ export class AnthropicChatBot {
 function* parseMessageStreamEvents(event: Anthropic.RawMessageStreamEvent) {
   switch (event.type) {
     case "message_start":
-      console.log('message starting"');
       break;
 
     case "content_block_delta":

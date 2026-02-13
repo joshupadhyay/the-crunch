@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Preference, Restaurant } from "./App";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
+import { StoryBar } from "./components/StoryBar";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,6 +19,7 @@ interface ChatViewProps {
 export function ChatView({ onContextUpdate }: ChatViewProps) {
   // this is conversation id
   const { conversationId } = useParams();
+  const navigate = useNavigate();
 
   // stores the entire conversation
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,13 +29,23 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const createNewChat = () => navigate("/chat/new");
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const isNew = conversationId === "new";
+
   useEffect(() => {
     // adjust focus with new message
     inputRef.current?.focus();
+
+    // Reset messages when navigating to a new chat
+    if (isNew) {
+      setMessages([]);
+      return;
+    }
 
     // Load conversation on inital click
     async function loadConversation() {
@@ -59,12 +71,24 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
     // now UI is loading as we wait for response
     setIsLoading(true);
 
+    // If this is a new chat, create the conversation first
+    let activeConversationId = conversationId;
+    if (isNew) {
+      const createResp = await fetch("/api/chat/create", { method: "POST" });
+      if (!createResp.ok) {
+        setIsLoading(false);
+        return;
+      }
+      const { id } = await createResp.json();
+      activeConversationId = id;
+    }
+
     const response = await fetch("/api/chat/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: input,
-        conversationId: conversationId,
+        conversationId: activeConversationId,
       }),
     });
 
@@ -112,6 +136,11 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
     }
 
     setIsLoading(false);
+
+    // Navigate to the real conversation URL after first message
+    if (isNew && activeConversationId) {
+      navigate(`/chat/${activeConversationId}`, { replace: true });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -121,24 +150,27 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
     }
   };
 
-  if (!conversationId) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-crunch-khaki-600">
-        <p className="font-display text-xl">Warming up the kitchen...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
       <header className="px-6 py-4 border-b-2 border-crunch-mahogany-200 bg-crunch-cream">
-        <h1 className="font-display text-3xl font-black text-crunch-mahogany-800 tracking-tight">
-          The Crunch
-        </h1>
-        <p className="text-crunch-khaki-600 text-sm mt-0.5">
-          Let's have a time!
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-3xl font-black text-crunch-mahogany-800 tracking-tight">
+              The Crunch
+            </h1>
+            <p className="text-crunch-khaki-600 text-sm mt-0.5">
+              Let's have a time!
+            </p>
+          </div>
+          <button
+            onClick={createNewChat}
+            className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
+          >
+            + New Chat
+          </button>
+        </div>
+        <StoryBar />
       </header>
 
       {/* Messages */}
