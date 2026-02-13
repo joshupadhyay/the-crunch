@@ -1,14 +1,37 @@
 import type { Preference, Restaurant } from "@/App";
 import { ChatView } from "@/ChatView";
 import { CorkBoard } from "@/CorkBoard";
+import { authClient } from "@/lib/auth-client";
 import { useState, useRef, useEffect } from "react";
-import { Outlet } from "react-router";
+import { Navigate, Outlet } from "react-router";
 
 /**
  * Homepage of application. Contains sidebar and ChatView elements which are selectively rerendered via Outlet
  * @returns
  */
 export function AppLayout() {
+  // follows the react "use" convention, we call it at the top level. Direct to login if no session.
+  const { data: session, isPending: pending } = authClient.useSession();
+
+  if (pending) {
+    return (
+      <>
+        <div className="room-ambience" />
+        <div className="console-frame">
+          <main className="flex-1 flex items-center justify-center bg-crunch-cream">
+            <p className="text-crunch-walnut-700 font-body text-lg animate-pulse">
+              Loading...
+            </p>
+          </main>
+        </div>
+      </>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to={"/login"}></Navigate>;
+  }
+
   return (
     <>
       {/* Green velvet ambient background */}
