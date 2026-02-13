@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
-import { unstable_v2_createSession } from "@anthropic-ai/claude-agent-sdk";
 import { executeTool, TOOLS } from "./tools";
 
 /** Convert domain Message[] to Anthropic SDK MessageParam[] */

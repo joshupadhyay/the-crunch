@@ -17,9 +17,8 @@ interface ChatViewProps {
 
 export function ChatView({ onContextUpdate }: ChatViewProps) {
   // this is conversation id
-  const params = useParams();
+  const { conversationId } = useParams();
 
-  const conversationId = params.id;
   // stores the entire conversation
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -33,10 +32,22 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
   }, [messages]);
 
   useEffect(() => {
+    // adjust focus with new message
     inputRef.current?.focus();
+
+    // Load conversation on inital click
+    async function loadConversation() {
+      const resp = await fetch(`/api/chat/conversations/${conversationId}`, {
+        method: "GET",
+      });
+
+      const messages: Message[] = await resp.json();
+
+      setMessages(messages);
+    }
+    loadConversation();
   }, [conversationId]);
 
-  // TODO: implement sendMessage — see confusions/streaming-howto.md
   const sendMessage = async () => {
     // append latest input to messages.. modifying like this to avoid adjusting messages inplace
 

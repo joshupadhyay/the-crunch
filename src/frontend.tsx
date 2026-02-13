@@ -5,6 +5,8 @@
  * It is included in `src/index.html`.
  */
 
+import "./index.css";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -18,7 +20,10 @@ const app = (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AppLayout />}>
-          <Route path="chat/:id" element={<ChatView />}></Route>
+          <Route
+            path="chat/:conversationId"
+            element={<ChatView onContextUpdate={() => {}} />}
+          ></Route>
         </Route>
       </Routes>
     </BrowserRouter>
