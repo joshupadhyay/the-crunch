@@ -3,6 +3,7 @@ import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
 import { SupabaseDB } from "./databases/SupabaseClient";
 import type { Message } from "./databases/Database";
+import { auth } from "./auth-client";
 
 /**
  * Init Chatbot, with Supabase Database
@@ -58,6 +59,11 @@ export const server = serve({
           return Response.json({ error: "Not found" }, { status: 404 });
         }
       },
+    },
+
+    // Let BetterAuth handle the auth for us!
+    "/api/auth/*": async (req) => {
+      return auth.handler(req);
     },
 
     "/api/chat/send": {
