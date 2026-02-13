@@ -13,12 +13,14 @@ import { App } from "./App";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { ChatView } from "./ChatView";
 import { AppLayout } from "./components/AppLayout";
+import { LoginPage } from "./components/LoginPage";
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<AppLayout />}>
           <Route
             path="chat/:conversationId"

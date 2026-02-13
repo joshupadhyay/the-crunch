@@ -28,6 +28,7 @@ export class SupabaseDB implements IDatabase {
   async createConversation(): Promise<Conversation> {
     const { data, error } = await this.client
       .from("conversations")
+      // TODO – WHEN WE HAVE AUTH WE MUST CHANGE THIS
       .insert({ user_id: "00000000-0000-0000-0000-000000000000" })
       .select("id, created_at")
       .single();
