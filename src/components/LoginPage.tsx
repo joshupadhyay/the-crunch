@@ -147,6 +147,27 @@ export function LoginPage() {
           </button>
         </form>
 
+        {/* divider */}
+        <div className="flex items-center gap-3 mt-6">
+          <div className="flex-1 h-px bg-crunch-khaki-300" />
+          <span className="font-body text-xs text-crunch-khaki-500">or</span>
+          <div className="flex-1 h-px bg-crunch-khaki-300" />
+        </div>
+
+        {/* twitter / X sign-in */}
+        <button
+          type="button"
+          onClick={() => signIn.social({ provider: "twitter" })}
+          className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+            font-body font-medium text-crunch-cream bg-neutral-900 hover:bg-neutral-800
+            active:bg-black transition-colors duration-200 cursor-pointer"
+        >
+          <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          Continue with X
+        </button>
+
         {/* toggle sign-in / sign-up */}
         <div className="mt-6 text-center">
           <button
