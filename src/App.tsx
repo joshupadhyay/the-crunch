@@ -79,12 +79,7 @@ export function App() {
       {/* Console frame with thick mahogany border */}
       <div className="console-frame">
         {/* Main chat area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream">
-          <ChatView
-            conversationId={conversationId}
-            onContextUpdate={handleContextUpdate}
-          />
-        </main>
+        <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream"></main>
 
         {/* Corkboard sidebar */}
         <CorkBoard
