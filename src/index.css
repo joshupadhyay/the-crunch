@@ -80,6 +80,15 @@
     transition-all duration-200;
 }
 
+/* Story bar — hide scrollbar, smooth touch scroll */
+.story-bar {
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+}
+.story-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
 /* Cork board texture effect */
 .bg-crunch-cork {
   background-color: #d4a574;
