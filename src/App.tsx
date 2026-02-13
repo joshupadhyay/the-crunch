@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { ChatView } from "./ChatView";
 import { CorkBoard } from "./CorkBoard";
+import { BrowserRouter } from "react-router";
 import "./index.css";
 
 export interface Preference {
@@ -39,7 +40,7 @@ export function App() {
           const merged = [...prev];
           for (const p of ctx.preferences!) {
             const existing = merged.findIndex(
-              (m) => m.label.toLowerCase() === p.label.toLowerCase()
+              (m) => m.label.toLowerCase() === p.label.toLowerCase(),
             );
             if (existing >= 0) {
               merged[existing] = p;
@@ -67,7 +68,7 @@ export function App() {
         }
       }
     },
-    []
+    [],
   );
 
   return (
@@ -78,12 +79,7 @@ export function App() {
       {/* Console frame with thick mahogany border */}
       <div className="console-frame">
         {/* Main chat area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream">
-          <ChatView
-            conversationId={conversationId}
-            onContextUpdate={handleContextUpdate}
-          />
-        </main>
+        <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream"></main>
 
         {/* Corkboard sidebar */}
         <CorkBoard

@@ -2,6 +2,7 @@ import { serve } from "bun";
 import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
 import { SupabaseDB } from "./databases/SupabaseClient";
+import type { Message } from "./databases/Database";
 
 /**
  * Init Chatbot, with Supabase Database
@@ -48,7 +49,10 @@ export const server = serve({
       async GET(req) {
         const id = req.params.id;
         try {
-          const messages = await chatbot.DATABASE.getConversation(id);
+          const resp = await chatbot.DATABASE.getConversation(id);
+
+          const messages = toDisplayMessages(resp);
+
           return Response.json(messages);
         } catch {
           return Response.json({ error: "Not found" }, { status: 404 });
@@ -67,13 +71,25 @@ export const server = serve({
 
           // start is to start the stream. We use the stream controller to grab chunks from the streamMessage
           async start(controller) {
-            for await (const chunk of chatbot.streamMessage(
-              { role: "user", content: message }, // take message from user and pass it to ChatBot
-              conversationId,
-            )) {
-              // We take the output from the chatbot, and stringify it...
+            try {
+              for await (const chunk of chatbot.streamMessage(
+                { role: "user", content: message }, // take message from user and pass it to ChatBot
+                conversationId,
+              )) {
+                // We take the output from the chatbot, and stringify it...
+                controller.enqueue(
+                  new TextEncoder().encode(JSON.stringify(chunk) + "\n"),
+                );
+              }
+            } catch (err: any) {
+              // Send error as a stream chunk so the frontend can display it
               controller.enqueue(
-                new TextEncoder().encode(JSON.stringify(chunk) + "\n"),
+                new TextEncoder().encode(
+                  JSON.stringify({
+                    type: "error",
+                    message: err.message ?? "Something went wrong",
+                  }) + "\n",
+                ),
               );
             }
 
@@ -101,3 +117,28 @@ export const server = serve({
     console: true,
   },
 });
+
+/**
+ * Converts raw DB messages into display-friendly messages.
+ * - Plain text messages: kept as-is
+ * - JSON array messages (tool use): extracts text from {type:"text"} blocks
+ * - Pure tool_result messages (no text): dropped entirely
+ */
+function toDisplayMessages(messages: Message[]): Message[] {
+  return messages.flatMap((msg) => {
+    try {
+      const parsed = JSON.parse(msg.content);
+      if (!Array.isArray(parsed)) return [msg];
+
+      const text = parsed
+        .filter((block: any) => block.type === "text")
+        .map((block: any) => block.text)
+        .join("");
+
+      if (!text) return []; // pure tool_result, drop it
+      return [{ role: msg.role, content: text }];
+    } catch {
+      return [msg]; // plain text, keep as-is
+    }
+  });
+}

@@ -5,14 +5,28 @@
  * It is included in `src/index.html`.
  */
 
+import "./index.css";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { BrowserRouter, Route, Routes } from "react-router";
+import { ChatView } from "./ChatView";
+import { AppLayout } from "./components/AppLayout";
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route
+            path="chat/:conversationId"
+            element={<ChatView onContextUpdate={() => {}} />}
+          ></Route>
+        </Route>
+      </Routes>
+    </BrowserRouter>
   </StrictMode>
 );
 
