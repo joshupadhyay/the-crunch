@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Preference, Restaurant } from "./App";
+import { useParams } from "react-router";
 
 interface Message {
   role: "user" | "assistant";
@@ -8,14 +9,17 @@ interface Message {
 }
 
 interface ChatViewProps {
-  conversationId: string | null;
   onContextUpdate: (ctx: {
     preferences?: Preference[];
     restaurants?: Restaurant[];
   }) => void;
 }
 
-export function ChatView({ conversationId, onContextUpdate }: ChatViewProps) {
+export function ChatView({ onContextUpdate }: ChatViewProps) {
+  // this is conversation id
+  const params = useParams();
+
+  const conversationId = params.id;
   // stores the entire conversation
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
