@@ -17,6 +17,12 @@ export interface Restaurant {
   reason: string;
 }
 
+export interface startingPoint {
+  name: string; // "Place name" (Double Chicken Please)
+  neighborhood: string; // Lower East Side
+  city: string; // New York City
+}
+
 export function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<Preference[]>([]);

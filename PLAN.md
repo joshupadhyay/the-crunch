@@ -1,117 +1,109 @@
+# Night-Out Planner (Demo) — Build Plan (Supabase + Bun + Exa + Mapbox MCP)
 
+## Goal
+User selects a starting venue → enters “planning mode” → AI generates **3 full itineraries (Plan A/B/C)** (each 2–4 stops) → user can toggle plans on a Mapbox map + vote → share a permalink + optionally export a static map image.
 
- yo. I want to build a restaurant reccomennding app - it's in `/Github/the-crunch`.      
-  The ui should look like like the 70s aesthetic, see this                               
-  https://www.pinterest.com/pin/281543724888708/      
+**Exa = discovery + context.**  
+**Mapbox = canonical POIs + lat/lng + visualization.**  
+**Supabase = persistence (itinerary JSON + optional place cache + votes + storage).**  
+**Bun = API + orchestration.**
 
+---
 
-The ui will be like this color palette 
+## High-level flow
 
+### 1) Start Mode (User picks canonical starting point)
+1. User types venue / neighborhood query.
+2. Backend calls Mapbox Search (via MCP) for autocomplete/POI search.
+3. UI shows top candidates (name + address + neighborhood).
+4. User selects 1 → app stores canonical `start_place` object (includes Mapbox id + lat/lng).
+
+### 2) Planning Mode (Vibe + Distance)
+User selects:
+- `vibe`: e.g. `slow_bar_night`, `sober_entertainment`, `date_night`, `divey`, etc.
+- `distance_pref`: `5_min_walk`, `15_min_walk`, `30_min_transit`
+
+Backend:
+1. Use Exa to discover candidate venues and/or curated lists around the start area, aligned to vibe.
+2. Resolve each candidate venue to canonical POI with Mapbox Search (lat/lng + address).
+3. Deduplicate venues across candidates.
+4. LLM assembles **3 plans** from canonical POIs:
+   - Plan A: conservative + close
+   - Plan B: best “vibe match”
+   - Plan C: more adventurous / farther
+
+### 3) Artifact + Sharing
+- Save itinerary + plans to Supabase with `share_slug`
+- Render interactive map + plan toggles on client
+- Optional: generate static map image per plan on share/export and store in Supabase Storage
+
+---
+
+## Architecture / Components
+
+### Client (Next.js or similar)
+Pages:
+- `/` Start mode (search + select start place)
+- `/plan` Planning mode (pick vibe + distance, generate plans)
+- `/i/:share_slug` Read-only shared itinerary + voting
+
+UI blocks:
+- PlaceSearch (autocomplete results)
+- PlanningControls (vibe + distance)
+- PlanCards (A/B/C + “Why” + stops + vote)
+- MapView (Mapbox GL JS: markers + fit bounds + plan toggle)
+
+### Backend (Bun API)
+Routes:
+- `GET /api/place/search?q=...&near=...` → Mapbox POI search/autocomplete
+- `POST /api/itinerary/create` → create itinerary from start_place, vibe, distance
+- `GET /api/i/:share_slug` → fetch saved itinerary JSON
+- `POST /api/i/:share_slug/vote` → increment vote for A/B/C
+- `POST /api/i/:share_slug/export` → generate static image(s), upload to storage, persist URLs
+
+### Supabase
+Tables:
+- `itineraries`
+  - `id uuid PK`
+  - `share_slug text unique`
+  - `start_place jsonb`
+  - `inputs jsonb` (vibe, distance_pref)
+  - `plans jsonb` (A/B/C)
+  - `selected_plan_key text nullable`
+  - `vote_counts jsonb` (or separate votes table)
+  - `assets jsonb` (static map images)
+  - `created_at timestamptz`
+- `places_cache` (optional but nice)
+  - `mapbox_id text PK`
+  - `name text`
+  - `address text`
+  - `lat double`
+  - `lng double`
+  - `categories jsonb`
+  - `last_verified_at timestamptz`
+- (Optional) `votes`
+  - `itinerary_id uuid`
+  - `plan_key text`
+  - `created_at timestamptz`
+  - `fingerprint text` (optional)
+
+Storage bucket:
+- `itinerary-assets/` for static map images (png)
+
+---
+
+## Data contracts (JSON)
+
+### `StartPlace`
+```json
 {
-  "dark-walnut": {
-    "50": "#fdeee8",
-    "100": "#faded1",
-    "200": "#f5bda3",
-    "300": "#f09c75",
-    "400": "#ec7b46",
-    "500": "#e75a18",
-    "600": "#b94813",
-    "700": "#8a360f",
-    "800": "#5c240a",
-    "900": "#2e1205",
-    "950": "#200d03"
-  },
-  "dark-khaki": {
-    "50": "#f7f4ee",
-    "100": "#efe9dc",
-    "200": "#dfd4b9",
-    "300": "#cfbe96",
-    "400": "#bfa873",
-    "500": "#af9250",
-    "600": "#8c7540",
-    "700": "#695830",
-    "800": "#463b20",
-    "900": "#231d10",
-    "950": "#18140b"
-  },
-  "tiger-orange": {
-    "50": "#fdf2e8",
-    "100": "#fae5d1",
-    "200": "#f6cba2",
-    "300": "#f1b074",
-    "400": "#ed9645",
-    "500": "#e87c17",
-    "600": "#ba6312",
-    "700": "#8b4a0e",
-    "800": "#5d3209",
-    "900": "#2e1905",
-    "950": "#201103"
-  },
-  "rich-mahogany": {
-    "50": "#fcede8",
-    "100": "#f9dbd2",
-    "200": "#f4b7a4",
-    "300": "#ee9377",
-    "400": "#e96f49",
-    "500": "#e34a1c",
-    "600": "#b63c16",
-    "700": "#882d11",
-    "800": "#5b1e0b",
-    "900": "#2d0f06",
-    "950": "#200a04"
-  },
-  "rosy-copper": {
-    "50": "#faeeeb",
-    "100": "#f4ddd7",
-    "200": "#e9bcaf",
-    "300": "#de9a87",
-    "400": "#d3785f",
-    "500": "#c85637",
-    "600": "#a0452c",
-    "700": "#783421",
-    "800": "#502316",
-    "900": "#28110b",
-    "950": "#1c0c08"
-  }
+  "provider": "mapbox",
+  "mapbox_id": "poi.123",
+  "name": "Clemente Bar",
+  "address": "....",
+  "neighborhood": "NoMad",
+  "city": "New York",
+  "lat": 40.74,
+  "lng": -73.99,
+  "confidence": 0.92
 }
-
-## Building the App, API, backend
-
-Single chat interface, communicate with the anthropic api. 
-
-Use my repo `/Github/claude-chatbot` to understand how I structured the chatbot calls, the API routes, the chat interface. 
-
-Use the same database scheme (local db). Use `bun` and the same project structure and style. USE AN AGENT FOR THIS.
-
-
-## Research Interaction:
-
-DESIGN PHILOSOPHY: 
-
-A user will chat with this bot, to help select a restaurant / bar. (Typically both, for a 'nice night out'). 
-
-The bot should have a default personality, a prompt, to be helpful in this domain. 
-
-The bot should have tools at its disposal:
-
-Search for MCP / access to applications like The Infatuation, OpenTable, Resy, Michelin Guide to search for restaurants based on budget, criteria, diner preferences and help the user decide!
-
-
-## UI /UX:
-
-As the user continues chatting, and the bot suggests places, there should be a sidebar – that has a corkboard texture. 
-
-As details about the diners and preferences come up, add "sticky notes" about user and dining preferences (vegetarian, meat, french, style, new york city neighborhood, etc). 
-
-Add suggested restaurants as 'pins' if the user expresses interest in them. 
-
-
-## For Claude, when reading this PLAN.md:
-
-YOU CAN DO THIS! YOU HAVE MANY TOOLS AT YOUR DISPOSAL
-
-look at `/Users/joshu/Github/josh-claudebook` for skills to help you along this journey!
-
-Spawn subagents where needed. 
-
-You have full reign to `--dangerously-skip-permissions`. I don't want to approve

@@ -135,6 +135,28 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
       ]);
     }
 
+    // Parse context block AFTER stream completes (full JSON is available)
+    const contextMatch = assistantText.match(/<!--context\s*([\s\S]*?)\s*-->/);
+    if (contextMatch) {
+      try {
+        // WE specify the <!---context---!> in our system prompt, so we know to look for these things
+        // and persist them when Claude recognizes "Important user information"
+        const ctx = JSON.parse(contextMatch[1]!);
+        onContextUpdate(ctx);
+      } catch {
+        // malformed JSON from Claude — skip it
+      }
+
+      // Strip the comment so users don't see it in chat
+      assistantText = assistantText
+        .replace(/<!--context\s*[\s\S]*?\s*-->/, "")
+        .trim();
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: "assistant", content: assistantText },
+      ]);
+    }
+
     setIsLoading(false);
 
     // Navigate to the real conversation URL after first message
@@ -179,11 +201,11 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">
               <h2 className="font-display text-4xl font-black text-crunch-walnut-700 mb-3">
-                Hey there, hungry?
+                Fancy a night out?
               </h2>
               <p className="text-crunch-khaki-600 text-lg leading-relaxed">
-                Tell me what kind of night you're planning and I'll find you the
-                perfect spot. Restaurants, bars, the whole deal.
+                Tell me what places you're considering, the distance you'd like
+                to travel, and I'll come up with plans.
               </p>
               <div className="mt-6 flex flex-wrap gap-2 justify-center">
                 {[
