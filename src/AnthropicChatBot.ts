@@ -17,11 +17,6 @@ function toMessageParams(messages: Message[]): MessageParam[] {
   });
 }
 
-/** Serialize SDK content to a string for storage */
-function serializeContent(content: MessageParam["content"]): string {
-  return typeof content === "string" ? content : JSON.stringify(content);
-}
-
 export class AnthropicChatBot {
   DATABASE: IDatabase;
   readonly client: Anthropic;
@@ -62,6 +57,9 @@ export class AnthropicChatBot {
     let stopReason: string | null = "tool_use";
 
     // TOOL USE LOOP: keep calling the API until Claude stops requesting tools
+
+    // pull up textContent, so when tool use ends we can still save the text from it
+    let textContent = "";
     while (stopReason === "tool_use") {
       const messages = await this.DATABASE.getConversation(conversationId);
 
@@ -73,7 +71,6 @@ export class AnthropicChatBot {
       });
 
       // Track state for this stream iteration
-      let textContent = "";
       const toolCalls: { name: string; id: string; input: string }[] = [];
       let currentToolName = "";
       let currentToolId = "";
@@ -163,6 +160,11 @@ export class AnthropicChatBot {
 
         // Loop continues → new API call with updated messages including tool results
       }
+    }
+
+    // already a string, no need to stringify
+    if (textContent) {
+      await this.DATABASE.pushMessage(conversationId, "assistant", textContent);
     }
   }
 }
