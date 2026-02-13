@@ -16,14 +16,20 @@ export const server = serve({
     "/*": index,
 
     "/api/chat/create": {
-      async POST() {
+      async POST(req) {
+        try { await authCheck(req); }
+        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+
         const conversation = await chatbot.DATABASE.createConversation();
         return Response.json(conversation);
       },
     },
 
     "/api/chat/conversations": {
-      async GET() {
+      async GET(req) {
+        try { await authCheck(req); }
+        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+
         const conversations = await chatbot.DATABASE.getAllConversations();
 
         const result = await Promise.all(
@@ -48,12 +54,13 @@ export const server = serve({
 
     "/api/chat/conversations/:id": {
       async GET(req) {
+        try { await authCheck(req); }
+        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+
         const id = req.params.id;
         try {
           const resp = await chatbot.DATABASE.getConversation(id);
-
           const messages = toDisplayMessages(resp);
-
           return Response.json(messages);
         } catch {
           return Response.json({ error: "Not found" }, { status: 404 });
@@ -68,6 +75,9 @@ export const server = serve({
 
     "/api/chat/send": {
       async POST(req) {
+        try { await authCheck(req); }
+        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+
         const body = await req.json();
 
         const { message, conversationId } = body;
@@ -147,4 +157,17 @@ function toDisplayMessages(messages: Message[]): Message[] {
       return [msg]; // plain text, keep as-is
     }
   });
+}
+
+/**
+ *
+ * @param req
+ * @returns
+ */
+async function authCheck(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+
+  if (!session) {
+    throw new Error("401 unauthorized");
+  }
 }
