@@ -15,6 +15,19 @@ export const server = serve({
   routes: {
     "/*": index,
 
+    "/api/mapbox-token": {
+      async GET(req) {
+        try { await authCheck(req); }
+        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+
+        const token = process.env.MAPBOX_ACCESS_TOKEN;
+        if (!token) {
+          return Response.json({ error: "MAPBOX_ACCESS_TOKEN not set" }, { status: 500 });
+        }
+        return Response.json({ token });
+      },
+    },
+
     "/api/chat/create": {
       async POST(req) {
         try { await authCheck(req); }

@@ -9,12 +9,18 @@ export interface Preference {
   value: string;
 }
 
+export interface GeocodeParams {
+  lat: number;
+  lng: number;
+}
+
 export interface Restaurant {
   name: string;
   cuisine: string;
   neighborhood: string;
   priceRange: string;
   reason: string;
+  geoCode?: GeocodeParams; // we will populate params with MapBox later
 }
 
 export interface startingPoint {
@@ -27,6 +33,7 @@ export function App() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [startingPlace, setStartingPlace] = useState<startingPoint>();
   const [boardExpanded, setBoardExpanded] = useState(false);
   const hasAutoExpanded = useRef(false);
 
@@ -40,7 +47,11 @@ export function App() {
   }, []);
 
   const handleContextUpdate = useCallback(
-    (ctx: { preferences?: Preference[]; restaurants?: Restaurant[] }) => {
+    (ctx: {
+      preferences?: Preference[];
+      restaurants?: Restaurant[];
+      startPlace?: startingPoint;
+    }) => {
       if (ctx.preferences) {
         setPreferences((prev) => {
           const merged = [...prev];
@@ -73,6 +84,11 @@ export function App() {
           setBoardExpanded(true);
         }
       }
+
+      if (ctx.startPlace) {
+        setStartingPlace(ctx.startPlace);
+        setBoardExpanded(true);
+      }
     },
     [],
   );
@@ -89,6 +105,7 @@ export function App() {
 
         {/* Corkboard sidebar */}
         <CorkBoard
+          startingPlace={startingPlace}
           preferences={preferences}
           restaurants={restaurants}
           isExpanded={boardExpanded}
