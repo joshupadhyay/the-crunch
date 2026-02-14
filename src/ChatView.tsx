@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import type { Preference, Restaurant } from "./App";
 import { useNavigate, useParams } from "react-router";
 import { StoryBar } from "./components/StoryBar";
+import { authClient } from "./lib/auth-client";
 
 interface Message {
   role: "user" | "assistant";
@@ -17,6 +18,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onContextUpdate }: ChatViewProps) {
+  const { data: session } = authClient.useSession();
   // this is conversation id
   const { conversationId } = useParams();
   const navigate = useNavigate();
@@ -185,12 +187,17 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
               Let's have a time!
             </p>
           </div>
-          <button
-            onClick={createNewChat}
-            className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
-          >
-            + New Chat
-          </button>
+          <div className="flex items-center gap-3">
+            <p className="text-crunch-khaki-600 text-sm font-body">
+              {session?.user?.name ?? "Guest"}
+            </p>
+            <button
+              onClick={createNewChat}
+              className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
+            >
+              + New Chat
+            </button>
+          </div>
         </div>
         <StoryBar />
       </header>

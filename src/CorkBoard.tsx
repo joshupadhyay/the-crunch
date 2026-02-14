@@ -1,6 +1,7 @@
 import type { Preference, Restaurant, startingPoint } from "./App";
 import { StickyNote } from "./StickyNote";
 import { RestaurantPin } from "./RestaurantPin";
+import { MapView } from "./MapView";
 
 interface CorkBoardProps {
   startingPlace?: startingPoint;
@@ -98,6 +99,13 @@ export function CorkBoard({
 
           {/* Cork texture area */}
           <div className="flex-1 overflow-y-auto p-4">
+            {/* Map shows when we have geocoded restaurants */}
+            {restaurants.some((r) => r.geoCode) && (
+              <div className="mb-4">
+                <MapView restaurants={restaurants} />
+              </div>
+            )}
+
             {!hasContent ? (
               <div className="h-full flex items-center justify-center">
                 <p className="text-crunch-walnut-700 text-sm text-center italic px-4 leading-relaxed">
