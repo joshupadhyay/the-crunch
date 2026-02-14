@@ -3,6 +3,7 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
 import { executeTool, TOOLS } from "./tools";
+import { SYSTEM_PROMPT } from "./system-prompt";
 
 /** Convert domain Message[] to Anthropic SDK MessageParam[] */
 function toMessageParams(messages: Message[]): MessageParam[] {
@@ -15,6 +16,19 @@ function toMessageParams(messages: Message[]): MessageParam[] {
     }
     return { role: m.role, content };
   });
+}
+
+interface ToolCall {
+  name: string;
+  id: string;
+  input: Record<string, unknown>;
+}
+
+/** What consumeStream collects while yielding frontend events */
+interface StreamResult {
+  textContent: string;
+  toolCalls: ToolCall[];
+  stopReason: string | null;
 }
 
 export class AnthropicChatBot {
@@ -35,171 +49,175 @@ export class AnthropicChatBot {
   }
 
   async createConversation() {
-    const conversationCreate = await this.DATABASE.createConversation();
-
-    return conversationCreate;
+    return this.DATABASE.createConversation();
   }
 
   async getMessages(conversationId: string) {
-    const messages = await this.DATABASE.getConversation(conversationId);
-
-    return messages;
+    return this.DATABASE.getConversation(conversationId);
   }
 
+  /**
+   * Orchestrator — sends a message and streams the response.
+   * Loops until Claude stops requesting tools.
+   */
   async *streamMessage(message: Message, conversationId: string) {
-    // Save the user's message to DB
+    // User message comes in, push it to the DB immediately
     await this.DATABASE.pushMessage(
       conversationId,
       message.role,
       message.content,
     );
 
+    // define the break condition of the while loop
     let stopReason: string | null = "tool_use";
 
-    // TOOL USE LOOP: keep calling the API until Claude stops requesting tools
-
-    // pull up textContent, so when tool use ends we can still save the text from it
-    let textContent = "";
+    // While the conversation is ongoing, pull latest messages, start streaming
     while (stopReason === "tool_use") {
       const messages = await this.DATABASE.getConversation(conversationId);
 
       const stream = await this.client.messages.create({
+        system: SYSTEM_PROMPT,
         messages: toMessageParams(messages),
         stream: true,
         tools: TOOLS,
         ...this.anthropicApiParams,
       });
 
-      // Track state for this stream iteration
-      const toolCalls: { name: string; id: string; input: string }[] = [];
-      let currentToolName = "";
-      let currentToolId = "";
-      let currentToolInput = "";
-      stopReason = null;
+      // yield* delegates frontend events AND captures the return value
+      const result = yield* this.consumeStream(stream);
+      stopReason = result.stopReason;
 
-      for await (const event of stream) {
-        // yield* delegates parsed chunks to the frontend (text, tool_use_start, etc.)
-        yield* parseMessageStreamEvents(event);
+      // If the stream pauses for tool use, we handle it. We have many tools with formats!
+      if (stopReason === "tool_use" && result.toolCalls.length > 0) {
+        await this.persistAssistantToolUse(conversationId, result);
+        yield* this.executeAndPersistTools(conversationId, result.toolCalls);
+      } else if (result.textContent) {
+        // if just text, push the AI's text straight to the DB
+        await this.DATABASE.pushMessage(
+          conversationId,
+          "assistant",
+          result.textContent,
+        );
+      }
+    }
+  }
 
-        // ALSO track tool call info for the loop
-        // We do this here because parseMessageStreamEvents is sync and can't execute tools
-        if (
-          event.type === "content_block_start" &&
-          event.content_block.type === "tool_use"
-        ) {
-          // A tool call is starting — capture name + id
+  /**
+   * Consumes the Anthropic stream event by event.
+   * Yields frontend events (text chunks, tool_use_start/stop) as they arrive.
+   * Returns the collected StreamResult when the stream ends.
+   */
+  private async *consumeStream(
+    stream: AsyncIterable<Anthropic.RawMessageStreamEvent>,
+  ): AsyncGenerator<unknown, StreamResult> {
+    const toolCalls: ToolCall[] = [];
+    let currentToolName = "";
+    let currentToolId = "";
+    let currentToolInput = "";
+    let textContent = "";
+    let stopReason: string | null = null;
+
+    for await (const event of stream) {
+      if (event.type === "content_block_start") {
+        if (event.content_block.type === "tool_use") {
           currentToolName = event.content_block.name;
           currentToolId = event.content_block.id;
           currentToolInput = "";
-        } else if (event.type === "content_block_delta") {
-          if (event.delta.type === "text_delta") {
-            textContent += event.delta.text;
-          } else if (event.delta.type === "input_json_delta") {
-            // Accumulate partial JSON pieces into full input
-            currentToolInput += event.delta.partial_json;
-          }
-        } else if (event.type === "content_block_stop" && currentToolName) {
-          // Tool block finished — save the accumulated tool call
+          yield {
+            type: "tool_use_start",
+            name: currentToolName,
+            id: currentToolId,
+          };
+        }
+      } else if (event.type === "content_block_delta") {
+        if (event.delta.type === "text_delta") {
+          textContent += event.delta.text;
+          yield { type: "text", text: event.delta };
+        } else if (event.delta.type === "input_json_delta") {
+          currentToolInput += event.delta.partial_json;
+          yield { type: "tool_input", partial_json: event.delta.partial_json };
+        }
+      } else if (event.type === "content_block_stop") {
+        if (currentToolName) {
           toolCalls.push({
             name: currentToolName,
             id: currentToolId,
-            input: currentToolInput,
+            input: JSON.parse(currentToolInput || "{}"),
           });
           currentToolName = "";
           currentToolId = "";
           currentToolInput = "";
-        } else if (event.type === "message_delta") {
-          // This tells us WHY Claude stopped: "tool_use" or "end_turn"
-          stopReason = event.delta.stop_reason;
+          yield { type: "tool_use_stop" };
         }
-      }
-
-      // If Claude wants tool results, execute them and save to DB for next iteration
-      if (stopReason === "tool_use" && toolCalls.length > 0) {
-        // Build the assistant message content blocks (text + tool_use)
-        const assistantContent: any[] = [];
-        if (textContent) {
-          assistantContent.push({ type: "text", text: textContent });
-        }
-        for (const tc of toolCalls) {
-          assistantContent.push({
-            type: "tool_use",
-            id: tc.id,
-            name: tc.name,
-            input: JSON.parse(tc.input || "{}"),
-          });
-        }
-
-        // Save assistant message with tool_use blocks
-        await this.DATABASE.pushMessage(
-          conversationId,
-          "assistant",
-          JSON.stringify(assistantContent),
-        );
-
-        // Execute each tool and collect results
-        const toolResults: any[] = [];
-        for (const tc of toolCalls) {
-          const result = await executeTool(
-            tc.name,
-            JSON.parse(tc.input || "{}"),
-          );
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content: JSON.stringify(result),
-          });
-        }
-
-        // Save tool results as a "user" message (Anthropic API requires tool_result in user role)
-        await this.DATABASE.pushMessage(
-          conversationId,
-          "user",
-          JSON.stringify(toolResults),
-        );
-
-        // Loop continues → new API call with updated messages including tool results
+      } else if (event.type === "message_delta") {
+        stopReason = event.delta.stop_reason;
       }
     }
 
-    // already a string, no need to stringify
-    if (textContent) {
-      await this.DATABASE.pushMessage(conversationId, "assistant", textContent);
+    return { textContent, toolCalls, stopReason };
+  }
+
+  /**
+   * Saves the assistant's response (text + tool_use blocks) to the DB
+   * so the next API call has the full conversation history.
+   *
+   * Tools have a different format, so we treat and handle them
+   */
+  private async persistAssistantToolUse(
+    conversationId: string,
+    result: StreamResult,
+  ) {
+    const content: MessageParam["content"] = [];
+    if (result.textContent) {
+      content.push({ type: "text", text: result.textContent });
     }
+    for (const tc of result.toolCalls) {
+      content.push({
+        type: "tool_use",
+        id: tc.id,
+        name: tc.name,
+        input: tc.input,
+      });
+    }
+    await this.DATABASE.pushMessage(
+      conversationId,
+      "assistant",
+      JSON.stringify(content),
+    );
+  }
+
+  /**
+   * Executes each tool call, yields results to the frontend (e.g. geocode_results),
+   * and saves tool_result messages to the DB for the next API iteration.
+   */
+  private async *executeAndPersistTools(
+    conversationId: string,
+    toolCalls: ToolCall[],
+  ) {
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+    for (const tc of toolCalls) {
+      const result = await executeTool(tc.name, tc.input);
+
+      // Stream geocode results directly to the frontend for map rendering
+
+      // We separtae GEOCODE_VENUES specifically because we'd like to render the map!s
+      if (tc.name === "geocode_venues") {
+        yield { type: "geocode_results", venues: result };
+      }
+
+      toolResults.push({
+        type: "tool_result",
+        tool_use_id: tc.id,
+        content: JSON.stringify(result),
+      });
+    }
+
+    // Anthropic API requires tool_result in user role
+    await this.DATABASE.pushMessage(
+      conversationId,
+      "user",
+      JSON.stringify(toolResults),
+    );
   }
 }
-
-function* parseMessageStreamEvents(event: Anthropic.RawMessageStreamEvent) {
-  switch (event.type) {
-    case "message_start":
-      break;
-
-    case "content_block_delta":
-      if (event.delta.type === "text_delta") {
-        yield { type: "text", text: event.delta };
-      } else if (event.delta.type === "input_json_delta") {
-        yield { type: "tool_input", partial_json: event.delta.partial_json };
-      }
-      break;
-    case "content_block_start":
-      if (event.content_block.type === "tool_use") {
-        // a tool call is starting — you get the tool name and id here
-
-        yield {
-          type: "tool_use_start",
-          name: event.content_block.name,
-          id: event.content_block.id,
-        };
-      }
-      break;
-    case "content_block_stop":
-      // a tool call is ending
-      yield {
-        type: "tool_use_stop",
-      };
-
-      break;
-  }
-}
-
-// "message_start" | "message_delta" | "message_stop" | "content_block_start" | "content_block_delta" | "content_block_stop"

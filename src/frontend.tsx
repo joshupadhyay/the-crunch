@@ -25,7 +25,7 @@ const app = (
           <Route index element={<Navigate to="/chat/new" replace />} />
           <Route
             path="chat/:conversationId"
-            element={<ChatView onContextUpdate={() => {}} />}
+            element={<ChatView />}
           />
         </Route>
       </Routes>
