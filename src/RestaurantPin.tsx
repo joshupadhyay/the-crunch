@@ -16,8 +16,20 @@ const PIN_COLORS = [
 export function RestaurantPin({ restaurant, index }: RestaurantPinProps) {
   const pinColor = PIN_COLORS[index % PIN_COLORS.length];
 
+  const mapsUrl = restaurant.geoCode
+    ? `https://www.google.com/maps/search/?api=1&query=${restaurant.geoCode.lat},${restaurant.geoCode.lng}`
+    : undefined;
+
+  const Wrapper = mapsUrl ? "a" : "div";
+  const wrapperProps = mapsUrl
+    ? { href: mapsUrl, target: "_blank", rel: "noopener noreferrer" }
+    : {};
+
   return (
-    <div className="bg-white rounded-lg border border-crunch-walnut-200 shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+    <Wrapper
+      {...wrapperProps}
+      className="block bg-white rounded-lg border border-crunch-walnut-200 shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+    >
       {/* Pin dot */}
       <div className="relative">
         <div
@@ -26,9 +38,14 @@ export function RestaurantPin({ restaurant, index }: RestaurantPinProps) {
       </div>
 
       <div className="px-3 py-3 pt-4">
-        <h4 className="font-display font-bold text-crunch-walnut-800 text-sm">
-          {restaurant.name}
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="font-display font-bold text-crunch-walnut-800 text-sm">
+            {restaurant.name}
+          </h4>
+          {mapsUrl && (
+            <span className="text-crunch-walnut-400 text-xs">Maps &rarr;</span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-1">
           <span className="text-xs text-crunch-khaki-600">
             {restaurant.cuisine}
@@ -48,6 +65,6 @@ export function RestaurantPin({ restaurant, index }: RestaurantPinProps) {
           </p>
         )}
       </div>
-    </div>
+    </Wrapper>
   );
 }
