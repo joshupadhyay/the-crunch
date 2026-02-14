@@ -1,8 +1,10 @@
-import type { Preference, Restaurant } from "./App";
+import type { Preference, Restaurant, startingPoint } from "./App";
 import { StickyNote } from "./StickyNote";
 import { RestaurantPin } from "./RestaurantPin";
+import { MapView } from "./MapView";
 
 interface CorkBoardProps {
+  startingPlace?: startingPoint;
   preferences: Preference[];
   restaurants: Restaurant[];
   isExpanded: boolean;
@@ -10,12 +12,14 @@ interface CorkBoardProps {
 }
 
 export function CorkBoard({
+  startingPlace,
   preferences,
   restaurants,
   isExpanded,
   onToggle,
 }: CorkBoardProps) {
-  const hasContent = preferences.length > 0 || restaurants.length > 0;
+  const hasContent =
+    !!startingPlace || preferences.length > 0 || restaurants.length > 0;
 
   return (
     <aside
@@ -95,6 +99,13 @@ export function CorkBoard({
 
           {/* Cork texture area */}
           <div className="flex-1 overflow-y-auto p-4">
+            {/* Map shows when we have geocoded restaurants */}
+            {restaurants.some((r) => r.geoCode) && (
+              <div className="mb-4">
+                <MapView restaurants={restaurants} />
+              </div>
+            )}
+
             {!hasContent ? (
               <div className="h-full flex items-center justify-center">
                 <p className="text-crunch-walnut-700 text-sm text-center italic px-4 leading-relaxed">
@@ -104,6 +115,23 @@ export function CorkBoard({
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Starting place pin */}
+                {startingPlace && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-crunch-walnut-600 uppercase tracking-widest mb-2 px-1">
+                      Starting Point
+                    </h3>
+                    <div className="bg-crunch-walnut-700 text-crunch-cream rounded-lg px-4 py-3 shadow-md">
+                      <p className="font-display text-base font-bold">
+                        {startingPlace.name}
+                      </p>
+                      <p className="text-crunch-walnut-200 text-xs mt-0.5">
+                        {startingPlace.neighborhood}, {startingPlace.city}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sticky notes for preferences */}
                 {preferences.length > 0 && (
                   <div>
