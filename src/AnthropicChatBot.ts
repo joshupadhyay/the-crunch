@@ -3,6 +3,7 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
 import { executeTool, TOOLS } from "./tools";
+import { SYSTEM_PROMPT } from "./system-prompt";
 
 /** Convert domain Message[] to Anthropic SDK MessageParam[] */
 function toMessageParams(messages: Message[]): MessageParam[] {
@@ -64,6 +65,7 @@ export class AnthropicChatBot {
       const messages = await this.DATABASE.getConversation(conversationId);
 
       const stream = await this.client.messages.create({
+        system: SYSTEM_PROMPT,
         messages: toMessageParams(messages),
         stream: true,
         tools: TOOLS,

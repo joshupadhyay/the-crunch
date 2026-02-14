@@ -1,17 +1,60 @@
-import type { Preference, Restaurant } from "@/App";
-import { ChatView } from "@/ChatView";
+import type { Preference, Restaurant, startingPoint } from "@/App";
 import { CorkBoard } from "@/CorkBoard";
 import { authClient } from "@/lib/auth-client";
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { Navigate, Outlet } from "react-router";
 
 /**
  * Homepage of application. Contains sidebar and ChatView elements which are selectively rerendered via Outlet
- * @returns
  */
 export function AppLayout() {
-  // follows the react "use" convention, we call it at the top level. Direct to login if no session.
   const { data: session, isPending: pending } = authClient.useSession();
+  const [boardExpanded, setBoardExpanded] = useState(false);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [preferences, setPreferences] = useState<Preference[]>([]);
+  const [startingPlace, setStartingPlace] = useState<startingPoint>();
+
+  const handleContextUpdate = useCallback(
+    (ctx: {
+      preferences?: Preference[];
+      restaurants?: Restaurant[];
+      startPlace?: startingPoint;
+    }) => {
+      if (ctx.preferences) {
+        setPreferences((prev) => {
+          const merged = [...prev];
+          for (const p of ctx.preferences!) {
+            const existing = merged.findIndex(
+              (m) => m.label.toLowerCase() === p.label.toLowerCase(),
+            );
+            if (existing >= 0) {
+              merged[existing] = p;
+            } else {
+              merged.push(p);
+            }
+          }
+          return merged;
+        });
+      }
+      if (ctx.restaurants) {
+        setRestaurants((prev) => {
+          const merged = [...prev];
+          for (const r of ctx.restaurants!) {
+            if (!merged.some((m) => m.name === r.name)) {
+              merged.push(r);
+            }
+          }
+          return merged;
+        });
+        if (!boardExpanded) setBoardExpanded(true);
+      }
+      if (ctx.startPlace) {
+        setStartingPlace(ctx.startPlace);
+        if (!boardExpanded) setBoardExpanded(true);
+      }
+    },
+    [boardExpanded],
+  );
 
   if (pending) {
     return (
@@ -29,7 +72,7 @@ export function AppLayout() {
   }
 
   if (!session) {
-    return <Navigate to={"/login"}></Navigate>;
+    return <Navigate to={"/login"} />;
   }
 
   return (
@@ -41,17 +84,17 @@ export function AppLayout() {
       <div className="console-frame">
         {/* Main chat area */}
         <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream">
-          {/* React router fills outlet with child components – see frontend.tsx */}
-          <Outlet />
+          <Outlet context={{ onToggleBoard: () => setBoardExpanded((prev) => !prev), onContextUpdate: handleContextUpdate }} />
         </main>
 
         {/* Corkboard sidebar */}
-        {/* <CorkBoard
+        <CorkBoard
+          startingPlace={startingPlace}
           preferences={preferences}
           restaurants={restaurants}
           isExpanded={boardExpanded}
           onToggle={() => setBoardExpanded((prev) => !prev)}
-        /> */}
+        />
       </div>
     </>
   );

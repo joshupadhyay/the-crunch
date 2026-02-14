@@ -81,7 +81,7 @@ interface GeocodeParams {
 }
 
 // Resolve venue names to lat/lng via Mapbox Search Box API
-
+// thi
 export async function geocodeVenues(params: GeocodeParams): Promise<unknown> {
   const token = process.env.MAPBOX_ACCESS_TOKEN;
   if (!token) {
@@ -94,7 +94,7 @@ export async function geocodeVenues(params: GeocodeParams): Promise<unknown> {
   const results = await Promise.all(
     params.venues.map(async (place) => {
       const query = encodeURIComponent(place.name);
-      const url = `https://api.mapbox.com/search/searchbox/v1/forward?q=${query}&bbox=${NYC_BBOX}&types=poi&limit=1&access_token=${token}`;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?bbox=${NYC_BBOX}&types=poi&limit=1&access_token=${token}`;
 
       try {
         const res = await fetch(url);
@@ -105,12 +105,12 @@ export async function geocodeVenues(params: GeocodeParams): Promise<unknown> {
           return { name: place.name, error: "Not found" };
         }
 
-        const [lng, lat] = feature.geometry.coordinates;
+        const [lng, lat] = feature.center;
         return {
           name: place.name,
           lat,
           lng,
-          address: feature.properties.full_address,
+          address: feature.place_name,
         };
       } catch (err: any) {
         return { name: place.name, error: err.message };

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Preference, Restaurant } from "./App";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useOutletContext, useParams } from "react-router";
 import { StoryBar } from "./components/StoryBar";
 import { authClient } from "./lib/auth-client";
 
@@ -10,15 +10,15 @@ interface Message {
   content: string;
 }
 
-interface ChatViewProps {
-  onContextUpdate: (ctx: {
-    preferences?: Preference[];
-    restaurants?: Restaurant[];
-  }) => void;
-}
-
-export function ChatView({ onContextUpdate }: ChatViewProps) {
+export function ChatView() {
   const { data: session } = authClient.useSession();
+  const { onToggleBoard, onContextUpdate } = useOutletContext<{
+    onToggleBoard: () => void;
+    onContextUpdate: (ctx: {
+      preferences?: Preference[];
+      restaurants?: Restaurant[];
+    }) => void;
+  }>();
   // this is conversation id
   const { conversationId } = useParams();
   const navigate = useNavigate();
@@ -74,6 +74,8 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
     setIsLoading(true);
 
     // If this is a new chat, create the conversation first
+
+    // this allows us to start at /chat/new, THEN only create a new conversation id when user sends a message
     let activeConversationId = conversationId;
     if (isNew) {
       const createResp = await fetch("/api/chat/create", { method: "POST" });
@@ -196,6 +198,13 @@ export function ChatView({ onContextUpdate }: ChatViewProps) {
               className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
             >
               + New Chat
+            </button>
+            <button
+              onClick={onToggleBoard}
+              className="px-3 py-1.5 rounded-full bg-crunch-mahogany-700 text-white text-sm font-body font-semibold hover:bg-crunch-mahogany-800 transition-colors cursor-pointer"
+              aria-label="Toggle board"
+            >
+              Board
             </button>
           </div>
         </div>
