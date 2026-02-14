@@ -37,10 +37,18 @@ export function AppLayout() {
         });
       }
       if (ctx.restaurants) {
+        // this looks claude slop-y
+        // check existing restaurants, if the contextupdate has geoCodes
+        // update hte geoCode ont he existing restaurants after finding their index
+
         setRestaurants((prev) => {
           const merged = [...prev];
           for (const r of ctx.restaurants!) {
-            if (!merged.some((m) => m.name === r.name)) {
+            const existingIdx = merged.findIndex((m) => m.name === r.name);
+            // returns -1 if not found, hence >= 0 check
+            if (existingIdx >= 0) {
+              if (r.geoCode) merged[existingIdx].geoCode = r.geoCode;
+            } else {
               merged.push(r);
             }
           }
@@ -49,6 +57,7 @@ export function AppLayout() {
         if (!boardExpanded) setBoardExpanded(true);
       }
       if (ctx.startPlace) {
+        // set starting place
         setStartingPlace(ctx.startPlace);
         if (!boardExpanded) setBoardExpanded(true);
       }
@@ -84,7 +93,12 @@ export function AppLayout() {
       <div className="console-frame">
         {/* Main chat area */}
         <main className="flex-1 flex flex-col min-w-0 bg-crunch-cream">
-          <Outlet context={{ onToggleBoard: () => setBoardExpanded((prev) => !prev), onContextUpdate: handleContextUpdate }} />
+          <Outlet
+            context={{
+              onToggleBoard: () => setBoardExpanded((prev) => !prev),
+              onContextUpdate: handleContextUpdate,
+            }}
+          />
         </main>
 
         {/* Corkboard sidebar */}

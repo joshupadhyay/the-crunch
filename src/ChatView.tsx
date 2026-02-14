@@ -129,6 +129,19 @@ export function ChatView() {
           setIsUsingTool(assistantText);
         } else if (parsed.type === "tool_use_stop") {
           setIsUsingTool(undefined);
+        } else if (parsed.type === "geocode_results") {
+          // this isn't wiping out existing restaurants, this tells CorkBoard to update the restauant cards with lat lng
+          const restaurants: Restaurant[] = parsed.venues
+            .filter((v: any) => v.lat && v.lng)
+            .map((v: any) => ({
+              name: v.name,
+              cuisine: "",
+              neighborhood: "",
+              priceRange: "",
+              reason: "",
+              geoCode: { lat: v.lat, lng: v.lng },
+            }));
+          onContextUpdate({ restaurants });
         }
       }
 

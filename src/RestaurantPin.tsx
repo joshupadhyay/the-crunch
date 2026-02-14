@@ -28,7 +28,7 @@ export function RestaurantPin({ restaurant, index }: RestaurantPinProps) {
   return (
     <Wrapper
       {...wrapperProps}
-      className="block bg-white rounded-lg border border-crunch-walnut-200 shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+      className={`block bg-white rounded-lg border border-crunch-walnut-200 shadow-md overflow-hidden hover:shadow-lg transition-shadow ${mapsUrl ? "cursor-pointer" : ""}`}
     >
       {/* Pin dot */}
       <div className="relative">

@@ -200,6 +200,8 @@ export class AnthropicChatBot {
       const result = await executeTool(tc.name, tc.input);
 
       // Stream geocode results directly to the frontend for map rendering
+
+      // We separtae GEOCODE_VENUES specifically because we'd like to render the map!s
       if (tc.name === "geocode_venues") {
         yield { type: "geocode_results", venues: result };
       }

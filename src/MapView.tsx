@@ -17,6 +17,7 @@ interface MapViewProps {
 export function MapView({ restaurants }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const [token, setToken] = useState<string | null>(null);
 
@@ -44,6 +45,8 @@ export function MapView({ restaurants }: MapViewProps) {
       new mapboxgl.NavigationControl({ showCompass: false }),
       "top-right",
     );
+
+    setMapReady(true);
   }, [token]);
 
   // Update markers when restaurants change
@@ -94,7 +97,7 @@ export function MapView({ restaurants }: MapViewProps) {
         zoom: 14,
       });
     }
-  }, [restaurants]);
+  }, [restaurants, mapReady]);
 
   if (!token) return null;
 
