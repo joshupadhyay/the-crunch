@@ -74,9 +74,14 @@ export function AppLayout() {
         <div className="room-ambience" />
         <div className="console-frame">
           <main className="flex-1 flex items-center justify-center bg-crunch-cream">
-            <p className="text-crunch-walnut-700 font-body text-lg animate-pulse">
-              Loading...
-            </p>
+            <div className="status-panel">
+              <p className="text-crunch-walnut-800 font-body text-base font-semibold">
+                Checking your session
+              </p>
+              <p className="text-crunch-khaki-600 font-body text-sm mt-1">
+                Redirecting you as soon as we know where you belong.
+              </p>
+            </div>
           </main>
         </div>
       </>

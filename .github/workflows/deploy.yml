@@ -53,6 +53,7 @@ jobs:
           TWITTER_CLIENT: ${{ secrets.TWITTER_CLIENT }}
           TWITTER_SECRET: ${{ secrets.TWITTER_SECRET }}
           BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+          BETTER_AUTH_TRUSTED_ORIGINS: ${{ secrets.BETTER_AUTH_TRUSTED_ORIGINS }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
@@ -83,6 +84,7 @@ jobs:
             --arg twitterClient "$TWITTER_CLIENT" \
             --arg twitterSecret "$TWITTER_SECRET" \
             --arg betterAuthUrl "$BETTER_AUTH_URL" \
+            --arg betterAuthTrustedOrigins "$BETTER_AUTH_TRUSTED_ORIGINS" \
             --arg betterAuthSecret "$BETTER_AUTH_SECRET" \
             --arg langfusePublic "$LANGFUSE_PUBLIC_KEY" \
             --arg langfuseSecret "$LANGFUSE_SECRET_KEY" \
@@ -94,6 +96,7 @@ jobs:
               TWITTER_CLIENT: $twitterClient,
               TWITTER_SECRET: $twitterSecret,
               BETTER_AUTH_URL: $betterAuthUrl,
+              BETTER_AUTH_TRUSTED_ORIGINS: $betterAuthTrustedOrigins,
               BETTER_AUTH_SECRET: $betterAuthSecret,
               LANGFUSE_PUBLIC_KEY: $langfusePublic,
               LANGFUSE_SECRET_KEY: $langfuseSecret,

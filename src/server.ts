@@ -12,6 +12,7 @@ const db = await createDatabase();
 const chatbot = new AnthropicChatBot(db);
 
 export const server = serve({
+  port: Number(process.env.PORT ?? 3000),
   routes: {
     "/*": index,
 

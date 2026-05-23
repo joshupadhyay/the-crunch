@@ -28,6 +28,7 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUsingTool, setIsUsingTool] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,138 +52,169 @@ export function ChatView() {
 
     // Load conversation on inital click
     async function loadConversation() {
-      const resp = await fetch(`/api/chat/conversations/${conversationId}`, {
-        method: "GET",
-      });
+      try {
+        setError(null);
+        const resp = await fetch(`/api/chat/conversations/${conversationId}`, {
+          method: "GET",
+        });
 
-      const messages: Message[] = await resp.json();
+        if (!resp.ok) {
+          throw new Error(await getResponseError(resp, "Could not load chat."));
+        }
 
-      setMessages(messages);
+        const messages: Message[] = await resp.json();
+        setMessages(messages);
+      } catch (err: any) {
+        setMessages([]);
+        setError(err.message ?? "Could not load chat.");
+      }
     }
     loadConversation();
   }, [conversationId]);
 
-  const sendMessage = async () => {
-    // append latest input to messages.. modifying like this to avoid adjusting messages inplace
+  async function getResponseError(resp: Response, fallback: string) {
+    try {
+      const data = await resp.json();
+      if (typeof data?.error === "string") return data.error;
+      if (typeof data?.message === "string") return data.message;
+    } catch {
+      // fall through to fallback
+    }
+    return fallback;
+  }
 
-    const latestMsg: Message = { role: "user", content: input };
+  const sendMessage = async () => {
+    const userText = input.trim();
+    if (!userText || isLoading) return;
+
+    const latestMsg: Message = { role: "user", content: userText };
 
     setMessages([...messages, latestMsg]);
     setInput(""); // clear input after pushing
+    setError(null);
 
     // now UI is loading as we wait for response
     setIsLoading(true);
 
-    // If this is a new chat, create the conversation first
-
-    // this allows us to start at /chat/new, THEN only create a new conversation id when user sends a message
-    let activeConversationId = conversationId;
-    if (isNew) {
-      const createResp = await fetch("/api/chat/create", { method: "POST" });
-      if (!createResp.ok) {
-        setIsLoading(false);
-        return;
-      }
-      const { id } = await createResp.json();
-      activeConversationId = id;
-    }
-
-    const response = await fetch("/api/chat/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: input,
-        conversationId: activeConversationId,
-      }),
-    });
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      setIsLoading(false);
-      return;
-    }
-    const decoder = new TextDecoder();
-
-    let assistantText = "";
-
-    // set empty chatbot message. We'll be updating this with each chunk as they come in
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-    while (true) {
-      // read chunk by chunk as it comes in
-      const { done, value } = await reader.read();
-
-      // while (true) because we don't know how many chunks. but we know we will get done message
-      if (done) break;
-
-      // parse the stringified JSON. we also need to grab the text.text, since that's what chunks send
-      const raw = decoder.decode(value);
-      const lines = raw.split("\n").filter((line) => line.trim());
-
-      // if multiple chunks, we need to split by `\n`, which the server sends as newline between chunks
-      // we parse each one, then add it to the text
-
-      for (const line of lines) {
-        const parsed = JSON.parse(line);
-
-        if (parsed.type === "text") {
-          assistantText += parsed.text.text;
-        } else if (parsed.type === "tool_use_start") {
-          // show tool use as it happens...
-          assistantText += `\n\n*Tool Use: ${parsed.name}...*\n\n`;
-          setIsUsingTool(assistantText);
-        } else if (parsed.type === "tool_use_stop") {
-          setIsUsingTool(undefined);
-        } else if (parsed.type === "geocode_results") {
-          // this isn't wiping out existing restaurants, this tells CorkBoard to update the restauant cards with lat lng
-          const restaurants: Restaurant[] = parsed.venues
-            .filter((v: any) => v.lat && v.lng)
-            .map((v: any) => ({
-              name: v.name,
-              cuisine: "",
-              neighborhood: "",
-              priceRange: "",
-              reason: "",
-              geoCode: { lat: v.lat, lng: v.lng },
-            }));
-          onContextUpdate({ restaurants });
+    try {
+      // If this is a new chat, create the conversation first
+      let activeConversationId = conversationId;
+      if (isNew) {
+        const createResp = await fetch("/api/chat/create", { method: "POST" });
+        if (!createResp.ok) {
+          throw new Error(
+            await getResponseError(
+              createResp,
+              "Could not start a new chat. Try signing in again.",
+            ),
+          );
         }
+        const { id } = await createResp.json();
+        activeConversationId = id;
       }
 
-      // replace the last message with updated text — new array, new object
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { role: "assistant", content: assistantText },
-      ]);
-    }
+      const response = await fetch("/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userText,
+          conversationId: activeConversationId,
+        }),
+      });
 
-    // Parse context block AFTER stream completes (full JSON is available)
-    const contextMatch = assistantText.match(/<!--context\s*([\s\S]*?)\s*-->/);
-    if (contextMatch) {
-      try {
-        // WE specify the <!---context---!> in our system prompt, so we know to look for these things
-        // and persist them when Claude recognizes "Important user information"
-        const ctx = JSON.parse(contextMatch[1]!);
-        onContextUpdate(ctx);
-      } catch {
-        // malformed JSON from Claude — skip it
+      if (!response.ok) {
+        throw new Error(
+          await getResponseError(response, "The chat service did not respond."),
+        );
       }
 
-      // Strip the comment so users don't see it in chat
-      assistantText = assistantText
-        .replace(/<!--context\s*[\s\S]*?\s*-->/, "")
-        .trim();
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { role: "assistant", content: assistantText },
-      ]);
-    }
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("The chat stream could not be opened.");
+      }
+      const decoder = new TextDecoder();
 
-    setIsLoading(false);
+      let assistantText = "";
 
-    // Navigate to the real conversation URL after first message
-    if (isNew && activeConversationId) {
-      navigate(`/chat/${activeConversationId}`, { replace: true });
+      // set empty chatbot message. We'll be updating this with each chunk as they come in
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        // read chunk by chunk as it comes in
+        const { done, value } = await reader.read();
+
+        // while (true) because we don't know how many chunks. but we know we will get done message
+        if (done) break;
+
+        // parse the stringified JSON. we also need to grab the text.text, since that's what chunks send
+        const raw = decoder.decode(value);
+        const lines = raw.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          const parsed = JSON.parse(line);
+
+          if (parsed.type === "error") {
+            throw new Error(parsed.error ?? "The assistant hit an error.");
+          } else if (parsed.type === "text") {
+            assistantText += parsed.text.text;
+          } else if (parsed.type === "tool_use_start") {
+            assistantText += `\n\n*Tool Use: ${parsed.name}...*\n\n`;
+            setIsUsingTool(assistantText);
+          } else if (parsed.type === "tool_use_stop") {
+            setIsUsingTool(undefined);
+          } else if (parsed.type === "geocode_results") {
+            const restaurants: Restaurant[] = parsed.venues
+              .filter((v: any) => v.lat && v.lng)
+              .map((v: any) => ({
+                name: v.name,
+                cuisine: "",
+                neighborhood: "",
+                priceRange: "",
+                reason: "",
+                geoCode: { lat: v.lat, lng: v.lng },
+              }));
+            onContextUpdate({ restaurants });
+          }
+        }
+
+        // replace the last message with updated text — new array, new object
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { role: "assistant", content: assistantText },
+        ]);
+      }
+
+      // Parse context block AFTER stream completes (full JSON is available)
+      const contextMatch = assistantText.match(
+        /<!--context\s*([\s\S]*?)\s*-->/,
+      );
+      if (contextMatch) {
+        try {
+          const ctx = JSON.parse(contextMatch[1]!);
+          onContextUpdate(ctx);
+        } catch {
+          // malformed JSON from Claude — skip it
+        }
+
+        // Strip the comment so users don't see it in chat
+        assistantText = assistantText
+          .replace(/<!--context\s*[\s\S]*?\s*-->/, "")
+          .trim();
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { role: "assistant", content: assistantText },
+        ]);
+      }
+
+      // Navigate to the real conversation URL after first message
+      if (isNew && activeConversationId) {
+        navigate(`/chat/${activeConversationId}`, { replace: true });
+      }
+    } catch (err: any) {
+      setError(err.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setIsUsingTool(undefined);
+      setIsLoading(false);
     }
   };
 
@@ -230,6 +262,11 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-crunch-cream">
+        {error && (
+          <div className="max-w-2xl mx-auto mb-4 form-alert" role="alert">
+            {error}
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">
@@ -291,6 +328,11 @@ export function ChatView() {
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-white text-crunch-walnut-600 rounded-2xl rounded-bl-sm border border-crunch-walnut-100 shadow-sm px-4 py-3">
+                  {isUsingTool && (
+                    <p className="text-xs text-crunch-khaki-600 mb-1">
+                      Checking live details...
+                    </p>
+                  )}
                   <span className="inline-flex gap-1 text-lg">
                     <span
                       className="animate-bounce"

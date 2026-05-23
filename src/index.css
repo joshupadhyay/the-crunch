@@ -62,7 +62,7 @@
 
 /* Login card — centered mahogany-framed panel */
 .login-card {
-  width: 100%;
+  width: min(calc(100vw - 24px), 400px);
   max-width: 400px;
   padding: 2.5rem;
   background-color: var(--color-crunch-cream);
@@ -78,6 +78,86 @@
     text-crunch-mahogany-800 font-body placeholder:text-crunch-khaki-400
     focus:outline-none focus:ring-2 focus:ring-crunch-walnut-400 focus:border-transparent
     transition-all duration-200;
+}
+
+.login-input[aria-invalid="true"] {
+  border-color: rgb(185 28 28 / 0.65);
+  box-shadow: 0 0 0 3px rgb(185 28 28 / 0.1);
+}
+
+.form-help {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-family: var(--font-body);
+}
+
+.form-alert {
+  color: rgb(153 27 27);
+  background: rgb(254 242 242);
+  border: 1px solid rgb(254 202 202);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-family: var(--font-body);
+}
+
+.auth-panel {
+  animation: auth-panel-enter 220ms ease-out;
+}
+
+.auth-field-enter {
+  animation: auth-field-enter 240ms ease-out;
+  will-change: transform, opacity;
+}
+
+.status-panel {
+  max-width: 24rem;
+  text-align: center;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-crunch-walnut-200);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.08);
+  animation: auth-panel-enter 220ms ease-out;
+}
+
+@keyframes auth-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes auth-field-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 1.5rem;
+    border-width: 4px;
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel,
+  .auth-field-enter,
+  .status-panel {
+    animation: none;
+  }
 }
 
 /* Story bar — hide scrollbar, smooth touch scroll */
