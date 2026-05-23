@@ -69,7 +69,6 @@ export class InfraCdkStack extends cdk.Stack {
       action: 'lambda:InvokeFunction',
       functionName: appFn.functionName,
       principal: '*',
-      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
     });
     publicInvokePermission.addPropertyOverride('InvokedViaFunctionUrl', true);
 

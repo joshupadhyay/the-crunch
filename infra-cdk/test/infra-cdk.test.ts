@@ -48,7 +48,6 @@ test('deploys serverless web app resources', () => {
   template.hasResourceProperties('AWS::Lambda::Permission', {
     Action: 'lambda:InvokeFunction',
     Principal: '*',
-    FunctionUrlAuthType: 'NONE',
     InvokedViaFunctionUrl: true,
   });
 
