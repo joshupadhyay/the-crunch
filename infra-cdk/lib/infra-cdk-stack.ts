@@ -65,6 +65,14 @@ export class InfraCdkStack extends cdk.Stack {
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
 
+    const publicInvokePermission = new lambda.CfnPermission(this, 'AllowPublicInvokeFunctionViaUrl', {
+      action: 'lambda:InvokeFunction',
+      functionName: appFn.functionName,
+      principal: '*',
+      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
+    });
+    publicInvokePermission.addPropertyOverride('InvokedViaFunctionUrl', true);
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: new origins.FunctionUrlOrigin(functionUrl),

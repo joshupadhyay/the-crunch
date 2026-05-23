@@ -45,5 +45,12 @@ test('deploys serverless web app resources', () => {
     FunctionUrlAuthType: 'NONE',
   });
 
+  template.hasResourceProperties('AWS::Lambda::Permission', {
+    Action: 'lambda:InvokeFunction',
+    Principal: '*',
+    FunctionUrlAuthType: 'NONE',
+    InvokedViaFunctionUrl: true,
+  });
+
   template.hasOutput('DistributionId', {});
 });
