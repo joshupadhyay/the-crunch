@@ -1,92 +1,89 @@
 import * as cdk from 'aws-cdk-lib';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as events from 'aws-cdk-lib/aws-events';
-import * as targets from 'aws-cdk-lib/aws-events-targets';
-import * as iam from 'aws-cdk-lib/aws-iam';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 export class InfraCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // The EC2 instance ID — passed as a CDK context variable or env var.
-    // Deploy with: cdk deploy -c instanceId=i-0abc123def456
-    const instanceId = this.node.tryGetContext('instanceId')
-      || process.env.EC2_INSTANCE_ID;
+    const imageTag = this.node.tryGetContext('imageTag') || process.env.IMAGE_TAG || 'latest';
+    const appSecretName = this.node.tryGetContext('appSecretName') || process.env.APP_SECRET_NAME || 'the-crunch/app-env';
 
-    if (!instanceId) {
-      throw new Error('EC2 instance ID required. Pass via: cdk deploy -c instanceId=i-0abc123...');
-    }
-
-    // =========================================================================
-    // Lambda — starts/stops the EC2 instance
-    // =========================================================================
-    const schedulerFn = new lambda.Function(this, 'Ec2Scheduler', {
-      functionName: 'the-crunch-ec2-scheduler',
-      runtime: lambda.Runtime.PYTHON_3_12,
-      handler: 'scheduler.handler',
-      code: lambda.Code.fromAsset('lambda'),
-      timeout: cdk.Duration.seconds(30),
-      environment: {
-        EC2_INSTANCE_ID: instanceId,
+    const chatTable = new dynamodb.Table(this, 'ChatTable', {
+      tableName: 'the-crunch-chat',
+      partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
       },
     });
 
-    // Grant the Lambda permission to start/stop this specific EC2 instance
-    schedulerFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ec2:StartInstances', 'ec2:StopInstances'],
-      resources: [`arn:aws:ec2:*:${this.account}:instance/${instanceId}`],
-    }));
-
-    // Also need DescribeInstances (doesn't support resource-level permissions)
-    schedulerFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ec2:DescribeInstances'],
-      resources: ['*'],
-    }));
-
-    // =========================================================================
-    // EventBridge Rules — cron schedules (all times in UTC)
-    //
-    // US Eastern:  9am ET = 1pm UTC (2pm during EST, 1pm during EDT)
-    //              8pm ET = midnight UTC (1am during EST, midnight during EDT)
-    //
-    // Using EDT (summer) times. Adjust if needed for EST (winter).
-    // =========================================================================
-
-    // Stop at 8pm ET (midnight UTC) every day
-    const stopRule = new events.Rule(this, 'StopRule', {
-      ruleName: 'the-crunch-stop-ec2',
-      schedule: events.Schedule.cron({ minute: '0', hour: '0' }),
-      description: 'Stop the-crunch EC2 at 8pm ET (midnight UTC)',
+    chatTable.addGlobalSecondaryIndex({
+      indexName: 'entityType-createdAt-index',
+      partitionKey: { name: 'entityType', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
-    stopRule.addTarget(new targets.LambdaFunction(schedulerFn, {
-      event: events.RuleTargetInput.fromObject({ action: 'stop' }),
-    }));
 
-    // Start at 9am ET (1pm UTC) every day
-    const startRule = new events.Rule(this, 'StartRule', {
-      ruleName: 'the-crunch-start-ec2',
-      schedule: events.Schedule.cron({ minute: '0', hour: '13' }),
-      description: 'Start the-crunch EC2 at 9am ET (1pm UTC)',
-    });
-    startRule.addTarget(new targets.LambdaFunction(schedulerFn, {
-      event: events.RuleTargetInput.fromObject({ action: 'start' }),
-    }));
+    const repository = ecr.Repository.fromRepositoryName(this, 'Repository', 'the-crunch');
+    const appSecret = secretsmanager.Secret.fromSecretNameV2(this, 'AppSecret', appSecretName);
 
-    // =========================================================================
-    // Outputs
-    // =========================================================================
-    new cdk.CfnOutput(this, 'SchedulerFunctionName', {
-      value: schedulerFn.functionName,
+    const appFn = new lambda.DockerImageFunction(this, 'WebApp', {
+      functionName: 'the-crunch-web',
+      code: lambda.DockerImageCode.fromEcr(repository, {
+        tagOrDigest: imageTag,
+      }),
+      memorySize: 1024,
+      timeout: cdk.Duration.minutes(15),
+      architecture: lambda.Architecture.X86_64,
+      environment: {
+        NODE_ENV: 'production',
+        CHAT_STORE: 'dynamodb',
+        CHAT_TABLE_NAME: chatTable.tableName,
+        THE_CRUNCH_SECRET_ID: appSecret.secretName,
+        AWS_LWA_PORT: '3000',
+        AWS_LWA_INVOKE_MODE: 'response_stream',
+      },
     });
-    new cdk.CfnOutput(this, 'InstanceId', {
-      value: instanceId,
+
+    chatTable.grantReadWriteData(appFn);
+    repository.grantPull(appFn);
+    appSecret.grantRead(appFn);
+
+    const functionUrl = appFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
-    new cdk.CfnOutput(this, 'StopSchedule', {
-      value: '8pm ET (midnight UTC) daily',
+
+    const distribution = new cloudfront.Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: origins.FunctionUrlOrigin.withOriginAccessControl(functionUrl),
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      comment: 'The Crunch serverless web app',
     });
-    new cdk.CfnOutput(this, 'StartSchedule', {
-      value: '9am ET (1pm UTC) daily',
+
+    new cdk.CfnOutput(this, 'FunctionUrl', {
+      value: functionUrl.url,
+    });
+
+    new cdk.CfnOutput(this, 'DistributionDomainName', {
+      value: distribution.distributionDomainName,
+    });
+
+    new cdk.CfnOutput(this, 'ChatTableName', {
+      value: chatTable.tableName,
     });
   }
 }
