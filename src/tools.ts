@@ -1,7 +1,14 @@
 import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import Exa from "exa-js";
 
-const exa = new Exa(process.env.EXA_API_KEY);
+let exa: Exa | undefined;
+
+function getExaClient() {
+  const key = process.env.EXA_API_KEY;
+  if (!key) return undefined;
+  exa ??= new Exa(key);
+  return exa;
+}
 
 // Restaurant search tool definition for Claude's tool use
 export const TOOLS: Tool[] = [
@@ -128,8 +135,8 @@ export async function searchExa(params: {
   query?: string;
   info_type?: "reviews" | "hours" | "neighborhood" | "general";
 }): Promise<unknown> {
-  const key = process.env.EXA_API_KEY;
-  if (!key) {
+  const client = getExaClient();
+  if (!client) {
     return {
       error: "Web search is not configured. EXA_API_KEY is not set.",
     };
@@ -152,7 +159,7 @@ export async function searchExa(params: {
   }
 
   try {
-    const res = await exa.search(searchQuery, {
+    const res = await client.search(searchQuery, {
       type: "auto",
       numResults: 5,
       contents: {
