@@ -46,4 +46,15 @@ test('deploys serverless web app resources', () => {
       SigningProtocol: 'sigv4',
     }),
   });
+
+  template.hasResourceProperties('AWS::Lambda::Permission', {
+    Action: 'lambda:InvokeFunction',
+    Principal: 'cloudfront.amazonaws.com',
+  });
+
+  template.hasResourceProperties('AWS::Lambda::Permission', {
+    Action: 'lambda:InvokeFunctionUrl',
+    Principal: 'cloudfront.amazonaws.com',
+    FunctionUrlAuthType: 'AWS_IAM',
+  });
 });

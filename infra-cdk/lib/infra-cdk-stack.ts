@@ -74,6 +74,23 @@ export class InfraCdkStack extends cdk.Stack {
       comment: 'The Crunch serverless web app',
     });
 
+    const distributionArn = `arn:${cdk.Aws.PARTITION}:cloudfront::${cdk.Aws.ACCOUNT_ID}:distribution/${distribution.distributionId}`;
+
+    new lambda.CfnPermission(this, 'AllowCloudFrontInvokeFunction', {
+      action: 'lambda:InvokeFunction',
+      functionName: appFn.functionName,
+      principal: 'cloudfront.amazonaws.com',
+      sourceArn: distributionArn,
+    });
+
+    new lambda.CfnPermission(this, 'AllowCloudFrontInvokeFunctionUrl', {
+      action: 'lambda:InvokeFunctionUrl',
+      functionName: appFn.functionName,
+      principal: 'cloudfront.amazonaws.com',
+      sourceArn: distributionArn,
+      functionUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+    });
+
     new cdk.CfnOutput(this, 'FunctionUrl', {
       value: functionUrl.url,
     });
