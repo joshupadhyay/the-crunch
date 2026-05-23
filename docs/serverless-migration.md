@@ -21,7 +21,7 @@ This is the implemented AWS-first serverless target.
 - Bun continues to run as the HTTP server.
 - Lambda Web Adapter translates Function URL requests into HTTP requests for Bun.
 - Function URL uses `RESPONSE_STREAM` for chat streaming.
-- CloudFront signs origin requests with origin access control, so the Function URL uses AWS IAM auth instead of being directly public. Lambda grants CloudFront both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, which IAM-auth Function URLs require.
+- CloudFront fronts a public Lambda Function URL. This intentionally exposes the app to the public internet while the application's own Better Auth routes protect user workflows.
 - DynamoDB stores chat conversations and messages.
 - CloudFront fronts the Function URL.
 - Secrets are stored in AWS Secrets Manager and loaded at runtime.
@@ -69,7 +69,7 @@ Better Auth remains Postgres-backed through `DATABASE_URL` for now. The next AWS
 ```mermaid
 flowchart LR
   User["Browser"] --> CF["CloudFront"]
-  CF --> URL["Lambda Function URL\nAWS_IAM + RESPONSE_STREAM"]
+  CF --> URL["Lambda Function URL\npublic + RESPONSE_STREAM"]
   URL --> LWA["Lambda Web Adapter"]
   LWA --> Bun["Bun web app"]
   Bun --> DDB["DynamoDB\nchat state"]

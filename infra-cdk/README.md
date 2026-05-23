@@ -7,7 +7,7 @@ This CDK app deploys The Crunch without an always-on EC2 host.
 - Existing ECR image: `the-crunch:<imageTag>`
 - Lambda container runtime with Lambda Web Adapter
 - Lambda Function URL in `RESPONSE_STREAM` mode
-- CloudFront in front of the Function URL with origin access control
+- CloudFront in front of the public Function URL
 - DynamoDB on-demand table for chat conversations and messages
 - AWS Secrets Manager secret for runtime app configuration
 

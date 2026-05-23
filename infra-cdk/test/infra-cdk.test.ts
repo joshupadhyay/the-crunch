@@ -35,26 +35,7 @@ test('deploys serverless web app resources', () => {
   });
 
   template.hasResourceProperties('AWS::Lambda::Url', {
-    AuthType: 'AWS_IAM',
+    AuthType: 'NONE',
     InvokeMode: 'RESPONSE_STREAM',
-  });
-
-  template.hasResourceProperties('AWS::CloudFront::OriginAccessControl', {
-    OriginAccessControlConfig: Match.objectLike({
-      OriginAccessControlOriginType: 'lambda',
-      SigningBehavior: 'always',
-      SigningProtocol: 'sigv4',
-    }),
-  });
-
-  template.hasResourceProperties('AWS::Lambda::Permission', {
-    Action: 'lambda:InvokeFunction',
-    Principal: 'cloudfront.amazonaws.com',
-  });
-
-  template.hasResourceProperties('AWS::Lambda::Permission', {
-    Action: 'lambda:InvokeFunctionUrl',
-    Principal: 'cloudfront.amazonaws.com',
-    FunctionUrlAuthType: 'AWS_IAM',
   });
 });

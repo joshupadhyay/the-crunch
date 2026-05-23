@@ -58,13 +58,13 @@ export class InfraCdkStack extends cdk.Stack {
     appSecret.grantRead(appFn);
 
     const functionUrl = appFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      authType: lambda.FunctionUrlAuthType.NONE,
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
 
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
-        origin: origins.FunctionUrlOrigin.withOriginAccessControl(functionUrl),
+        origin: new origins.FunctionUrlOrigin(functionUrl),
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
@@ -72,23 +72,6 @@ export class InfraCdkStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
       comment: 'The Crunch serverless web app',
-    });
-
-    const distributionArn = `arn:${cdk.Aws.PARTITION}:cloudfront::${cdk.Aws.ACCOUNT_ID}:distribution/${distribution.distributionId}`;
-
-    new lambda.CfnPermission(this, 'AllowCloudFrontInvokeFunction', {
-      action: 'lambda:InvokeFunction',
-      functionName: appFn.functionName,
-      principal: 'cloudfront.amazonaws.com',
-      sourceArn: distributionArn,
-    });
-
-    new lambda.CfnPermission(this, 'AllowCloudFrontInvokeFunctionUrl', {
-      action: 'lambda:InvokeFunctionUrl',
-      functionName: appFn.functionName,
-      principal: 'cloudfront.amazonaws.com',
-      sourceArn: distributionArn,
-      functionUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
     });
 
     new cdk.CfnOutput(this, 'FunctionUrl', {
