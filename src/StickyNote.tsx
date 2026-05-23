@@ -23,8 +23,8 @@ interface StickyNoteProps {
 }
 
 export function StickyNote({ label, value, colorIndex }: StickyNoteProps) {
-  const color = STICKY_COLORS[colorIndex % STICKY_COLORS.length];
-  const rotation = ROTATIONS[colorIndex % ROTATIONS.length];
+  const color = STICKY_COLORS[colorIndex % STICKY_COLORS.length] ?? STICKY_COLORS[0]!;
+  const rotation = ROTATIONS[colorIndex % ROTATIONS.length] ?? ROTATIONS[0]!;
 
   return (
     <div

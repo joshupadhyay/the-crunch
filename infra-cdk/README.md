@@ -1,8 +1,36 @@
-# Welcome to your CDK TypeScript project
+# The Crunch Serverless Infrastructure
 
-This is a blank project for CDK development with TypeScript.
+This CDK app deploys The Crunch without an always-on EC2 host.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Architecture
+
+- Existing ECR image: `the-crunch:<imageTag>`
+- Lambda container runtime with Lambda Web Adapter
+- Lambda Function URL in `RESPONSE_STREAM` mode
+- CloudFront in front of the Function URL with origin access control
+- DynamoDB on-demand table for chat conversations and messages
+- AWS Secrets Manager secret for runtime app configuration
+
+The default secret name is `the-crunch/app-env`. It should contain JSON values
+for the app environment, for example:
+
+```json
+{
+  "ANTHROPIC_API_KEY": "...",
+  "DATABASE_URL": "...",
+  "MAPBOX_ACCESS_TOKEN": "...",
+  "BETTER_AUTH_URL": "...",
+  "LANGFUSE_PUBLIC_KEY": "...",
+  "LANGFUSE_SECRET_KEY": "...",
+  "LANGFUSE_BASE_URL": "https://cloud.langfuse.com"
+}
+```
+
+Deploy with a specific image tag:
+
+```sh
+npx cdk deploy --require-approval never -c imageTag=<git-sha>
+```
 
 ## Useful commands
 

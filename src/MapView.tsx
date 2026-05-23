@@ -89,11 +89,10 @@ export function MapView({ restaurants }: MapViewProps) {
     if (geoRestaurants.length > 1) {
       map.current.fitBounds(bounds, { padding: 40, maxZoom: 15 });
     } else {
+      const restaurant = geoRestaurants[0];
+      if (!restaurant?.geoCode) return;
       map.current.flyTo({
-        center: [
-          geoRestaurants[0].geoCode!.lng,
-          geoRestaurants[0].geoCode!.lat,
-        ],
+        center: [restaurant.geoCode.lng, restaurant.geoCode.lat],
         zoom: 14,
       });
     }

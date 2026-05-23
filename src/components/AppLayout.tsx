@@ -47,7 +47,10 @@ export function AppLayout() {
             const existingIdx = merged.findIndex((m) => m.name === r.name);
             // returns -1 if not found, hence >= 0 check
             if (existingIdx >= 0) {
-              if (r.geoCode) merged[existingIdx].geoCode = r.geoCode;
+              const existingRestaurant = merged[existingIdx];
+              if (r.geoCode && existingRestaurant) {
+                existingRestaurant.geoCode = r.geoCode;
+              }
             } else {
               merged.push(r);
             }
