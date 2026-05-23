@@ -9,5 +9,5 @@ new InfraCdkStack(app, 'TheCrunchInfra', {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION || 'us-east-1',
   },
-  description: 'The Crunch — EC2 scheduler (stop at 8pm, start at 9am ET)',
+  description: 'The Crunch — serverless Lambda Web Adapter deployment',
 });

@@ -1,7 +1,9 @@
 node_modules
+infra-cdk/node_modules
+infra-cdk/cdk.out
+.git
 .env
 .env.*
-.git
 .DS_Store
 .idea
 coverage

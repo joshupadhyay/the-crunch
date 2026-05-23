@@ -1,14 +1,14 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { AnthropicChatBot } from "./AnthropicChatBot";
-import { SupabaseDB } from "./databases/SupabaseClient";
+import { createDatabase } from "./databases/createDatabase";
 import type { Message } from "./databases/Database";
 import { auth } from "./auth-client";
 
 /**
- * Init Chatbot, with Supabase Database
+ * Init Chatbot with the configured persistent store.
  */
-const db = await SupabaseDB.connect();
+const db = await createDatabase();
 const chatbot = new AnthropicChatBot(db);
 
 export const server = serve({

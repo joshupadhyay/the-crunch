@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy serverless
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: the-crunch
+  APP_SECRET_NAME: the-crunch/app-env
 
 permissions:
   id-token: write
@@ -29,6 +30,11 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPOSITORY" --image-scanning-configuration scanOnPush=true
+
       - name: Build, tag, and push Docker image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -38,25 +44,51 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
+      - name: Upsert runtime secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          TWITTER_CLIENT: ${{ secrets.TWITTER_CLIENT }}
+          TWITTER_SECRET: ${{ secrets.TWITTER_SECRET }}
+          BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+        run: |
+          SECRET_JSON="$(jq -n \
+            --arg anthropic "$ANTHROPIC_API_KEY" \
+            --arg database "$DATABASE_URL" \
+            --arg mapbox "$MAPBOX_ACCESS_TOKEN" \
+            --arg twitterClient "$TWITTER_CLIENT" \
+            --arg twitterSecret "$TWITTER_SECRET" \
+            --arg betterAuthUrl "$BETTER_AUTH_URL" \
+            --arg langfusePublic "$LANGFUSE_PUBLIC_KEY" \
+            --arg langfuseSecret "$LANGFUSE_SECRET_KEY" \
+            --arg langfuseBaseUrl "$LANGFUSE_BASE_URL" \
+            '{
+              ANTHROPIC_API_KEY: $anthropic,
+              DATABASE_URL: $database,
+              MAPBOX_ACCESS_TOKEN: $mapbox,
+              TWITTER_CLIENT: $twitterClient,
+              TWITTER_SECRET: $twitterSecret,
+              BETTER_AUTH_URL: $betterAuthUrl,
+              LANGFUSE_PUBLIC_KEY: $langfusePublic,
+              LANGFUSE_SECRET_KEY: $langfuseSecret,
+              LANGFUSE_BASE_URL: $langfuseBaseUrl
+            } | with_entries(select(.value != ""))')"
 
-            docker pull ${{ steps.ecr-login.outputs.registry }}/the-crunch:latest
+          aws secretsmanager describe-secret --secret-id "$APP_SECRET_NAME" >/dev/null 2>&1 \
+            && aws secretsmanager put-secret-value --secret-id "$APP_SECRET_NAME" --secret-string "$SECRET_JSON" \
+            || aws secretsmanager create-secret --name "$APP_SECRET_NAME" --secret-string "$SECRET_JSON"
 
-            docker stop the-crunch 2>/dev/null || true
-            docker rm the-crunch 2>/dev/null || true
+      - name: Install CDK dependencies
+        working-directory: infra-cdk
+        run: npm ci
 
-            docker run -d \
-              --name the-crunch \
-              --restart unless-stopped \
-              -p 80:3000 \
-              --env-file /home/ec2-user/.env \
-              ${{ steps.ecr-login.outputs.registry }}/the-crunch:latest
-
-            docker image prune -f
+      - name: Deploy serverless stack
+        working-directory: infra-cdk
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          APP_SECRET_NAME: ${{ env.APP_SECRET_NAME }}
+        run: npx cdk deploy --require-approval never -c imageTag="$IMAGE_TAG"
