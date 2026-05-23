@@ -44,4 +44,6 @@ test('deploys serverless web app resources', () => {
     Principal: '*',
     FunctionUrlAuthType: 'NONE',
   });
+
+  template.hasOutput('DistributionId', {});
 });

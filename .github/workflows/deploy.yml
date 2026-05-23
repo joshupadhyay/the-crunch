@@ -94,30 +94,22 @@ jobs:
           APP_SECRET_NAME: ${{ env.APP_SECRET_NAME }}
         run: npx cdk deploy --require-approval never -c imageTag="$IMAGE_TAG"
 
-      - name: Verify serverless endpoint
+      - name: Invalidate CloudFront cache
         run: |
-          DISTRIBUTION_DOMAIN="$(aws cloudformation describe-stacks \
+          DISTRIBUTION_ID="$(aws cloudformation describe-stacks \
             --stack-name TheCrunchInfra \
-            --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" \
             --output text)"
 
-          APP_URL="https://${DISTRIBUTION_DOMAIN}/"
-          echo "Verifying ${APP_URL}"
+          INVALIDATION_ID="$(aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths '/*' \
+            --query 'Invalidation.Id' \
+            --output text)"
 
-          set +e
-          curl -fsS -D /tmp/the-crunch-headers.txt "$APP_URL" -o /tmp/the-crunch-body.txt
-          CURL_STATUS=$?
-          set -e
-
-          cat /tmp/the-crunch-headers.txt || true
-          head -c 1000 /tmp/the-crunch-body.txt || true
-          echo
-
-          if [ "$CURL_STATUS" -ne 0 ]; then
-            echo "Endpoint verification failed; recent Lambda logs:"
-            aws logs tail /aws/lambda/the-crunch-web --since 10m || true
-            exit "$CURL_STATUS"
-          fi
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --id "$INVALIDATION_ID"
 
       - name: Smoke test deployed app
         run: |
@@ -129,7 +121,8 @@ jobs:
           APP_URL="https://${DISTRIBUTION_DOMAIN}"
           echo "Testing $APP_URL"
 
-          curl --fail --show-error --silent --max-time 60 "$APP_URL/" >/tmp/the-crunch-home.html
+          curl --fail --show-error --silent --max-time 60 -D /tmp/the-crunch-headers.txt "$APP_URL/" >/tmp/the-crunch-home.html
+          cat /tmp/the-crunch-headers.txt
           grep -q "The Crunch" /tmp/the-crunch-home.html
 
           status="$(curl --show-error --silent --max-time 60 \

@@ -85,6 +85,10 @@ export class InfraCdkStack extends cdk.Stack {
       value: distribution.distributionDomainName,
     });
 
+    new cdk.CfnOutput(this, 'DistributionId', {
+      value: distribution.distributionId,
+    });
+
     new cdk.CfnOutput(this, 'ChatTableName', {
       value: chatTable.tableName,
     });
