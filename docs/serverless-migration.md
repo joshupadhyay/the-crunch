@@ -21,7 +21,7 @@ This is the implemented AWS-first serverless target.
 - Bun continues to run as the HTTP server.
 - Lambda Web Adapter translates Function URL requests into HTTP requests for Bun.
 - Function URL uses `RESPONSE_STREAM` for chat streaming.
-- CloudFront fronts a public Lambda Function URL. This intentionally exposes the app to the public internet while the application's own Better Auth routes protect user workflows.
+- CloudFront fronts a public Lambda Function URL. This intentionally exposes the app to the public internet while the application's own Better Auth routes protect user workflows. The Lambda resource policy grants both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` for Function URL requests, which the newer Lambda URL auth model requires.
 - DynamoDB stores chat conversations and messages.
 - CloudFront fronts the Function URL.
 - Secrets are stored in AWS Secrets Manager and loaded at runtime.

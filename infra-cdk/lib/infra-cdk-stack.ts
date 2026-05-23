@@ -3,6 +3,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
@@ -54,8 +55,10 @@ export class InfraCdkStack extends cdk.Stack {
     });
 
     chatTable.grantReadWriteData(appFn);
-    repository.grantPull(appFn);
     appSecret.grantRead(appFn);
+    appFn.role?.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'),
+    );
 
     const functionUrl = appFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

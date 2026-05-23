@@ -38,4 +38,10 @@ test('deploys serverless web app resources', () => {
     AuthType: 'NONE',
     InvokeMode: 'RESPONSE_STREAM',
   });
+
+  template.hasResourceProperties('AWS::Lambda::Permission', {
+    Action: 'lambda:InvokeFunctionUrl',
+    Principal: '*',
+    FunctionUrlAuthType: 'NONE',
+  });
 });
