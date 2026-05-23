@@ -53,31 +53,52 @@ jobs:
           TWITTER_CLIENT: ${{ secrets.TWITTER_CLIENT }}
           TWITTER_SECRET: ${{ secrets.TWITTER_SECRET }}
           BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
         run: |
+          EXISTING_SECRET="$(aws secretsmanager get-secret-value \
+            --secret-id "$APP_SECRET_NAME" \
+            --query SecretString \
+            --output text 2>/dev/null || echo '{}')"
+
+          if [ -z "$EXISTING_SECRET" ] || [ "$EXISTING_SECRET" = "None" ]; then
+            EXISTING_SECRET="{}"
+          fi
+
+          if [ -z "$BETTER_AUTH_SECRET" ]; then
+            BETTER_AUTH_SECRET="$(jq -r '.BETTER_AUTH_SECRET // empty' <<< "$EXISTING_SECRET")"
+          fi
+
+          if [ -z "$BETTER_AUTH_SECRET" ]; then
+            BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
+          fi
+
           SECRET_JSON="$(jq -n \
+            --argjson existing "$EXISTING_SECRET" \
             --arg anthropic "$ANTHROPIC_API_KEY" \
             --arg database "$DATABASE_URL" \
             --arg mapbox "$MAPBOX_ACCESS_TOKEN" \
             --arg twitterClient "$TWITTER_CLIENT" \
             --arg twitterSecret "$TWITTER_SECRET" \
             --arg betterAuthUrl "$BETTER_AUTH_URL" \
+            --arg betterAuthSecret "$BETTER_AUTH_SECRET" \
             --arg langfusePublic "$LANGFUSE_PUBLIC_KEY" \
             --arg langfuseSecret "$LANGFUSE_SECRET_KEY" \
             --arg langfuseBaseUrl "$LANGFUSE_BASE_URL" \
-            '{
+            '$existing * ({
               ANTHROPIC_API_KEY: $anthropic,
               DATABASE_URL: $database,
               MAPBOX_ACCESS_TOKEN: $mapbox,
               TWITTER_CLIENT: $twitterClient,
               TWITTER_SECRET: $twitterSecret,
               BETTER_AUTH_URL: $betterAuthUrl,
+              BETTER_AUTH_SECRET: $betterAuthSecret,
               LANGFUSE_PUBLIC_KEY: $langfusePublic,
               LANGFUSE_SECRET_KEY: $langfuseSecret,
               LANGFUSE_BASE_URL: $langfuseBaseUrl
-            } | with_entries(select(.value != ""))')"
+            } | with_entries(select(.value != "")))')"
 
           aws secretsmanager describe-secret --secret-id "$APP_SECRET_NAME" >/dev/null 2>&1 \
             && aws secretsmanager put-secret-value --secret-id "$APP_SECRET_NAME" --secret-string "$SECRET_JSON" \
