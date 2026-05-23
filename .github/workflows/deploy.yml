@@ -93,3 +93,58 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
           APP_SECRET_NAME: ${{ env.APP_SECRET_NAME }}
         run: npx cdk deploy --require-approval never -c imageTag="$IMAGE_TAG"
+
+      - name: Verify serverless endpoint
+        run: |
+          DISTRIBUTION_DOMAIN="$(aws cloudformation describe-stacks \
+            --stack-name TheCrunchInfra \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue" \
+            --output text)"
+
+          APP_URL="https://${DISTRIBUTION_DOMAIN}/"
+          echo "Verifying ${APP_URL}"
+
+          set +e
+          curl -fsS -D /tmp/the-crunch-headers.txt "$APP_URL" -o /tmp/the-crunch-body.txt
+          CURL_STATUS=$?
+          set -e
+
+          cat /tmp/the-crunch-headers.txt || true
+          head -c 1000 /tmp/the-crunch-body.txt || true
+          echo
+
+          if [ "$CURL_STATUS" -ne 0 ]; then
+            echo "Endpoint verification failed; recent Lambda logs:"
+            aws logs tail /aws/lambda/the-crunch-web --since 10m || true
+            exit "$CURL_STATUS"
+          fi
+
+      - name: Smoke test deployed app
+        run: |
+          DISTRIBUTION_DOMAIN="$(aws cloudformation describe-stacks \
+            --stack-name TheCrunchInfra \
+            --query 'Stacks[0].Outputs[?OutputKey==`DistributionDomainName`].OutputValue' \
+            --output text)"
+
+          APP_URL="https://${DISTRIBUTION_DOMAIN}"
+          echo "Testing $APP_URL"
+
+          curl --fail --show-error --silent --max-time 60 "$APP_URL/" >/tmp/the-crunch-home.html
+          grep -q "The Crunch" /tmp/the-crunch-home.html
+
+          status="$(curl --show-error --silent --max-time 60 \
+            --request POST \
+            --output /tmp/the-crunch-create.json \
+            --write-out "%{http_code}" \
+            "$APP_URL/api/chat/create")"
+
+          if [ "$status" != "401" ]; then
+            echo "Expected unauthenticated chat create to return 401, got $status"
+            cat /tmp/the-crunch-create.json
+            exit 1
+          fi
+
+      - name: Print Lambda logs on failure
+        if: failure()
+        run: |
+          aws logs tail /aws/lambda/the-crunch-web --since 15m || true
