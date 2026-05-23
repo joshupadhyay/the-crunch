@@ -50,6 +50,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           TWITTER_CLIENT: ${{ secrets.TWITTER_CLIENT }}
           TWITTER_SECRET: ${{ secrets.TWITTER_SECRET }}
           BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
@@ -81,6 +82,7 @@ jobs:
             --arg anthropic "$ANTHROPIC_API_KEY" \
             --arg database "$DATABASE_URL" \
             --arg mapbox "$MAPBOX_ACCESS_TOKEN" \
+            --arg exa "$EXA_API_KEY" \
             --arg twitterClient "$TWITTER_CLIENT" \
             --arg twitterSecret "$TWITTER_SECRET" \
             --arg betterAuthUrl "$BETTER_AUTH_URL" \
@@ -93,6 +95,7 @@ jobs:
               ANTHROPIC_API_KEY: $anthropic,
               DATABASE_URL: $database,
               MAPBOX_ACCESS_TOKEN: $mapbox,
+              EXA_API_KEY: $exa,
               TWITTER_CLIENT: $twitterClient,
               TWITTER_SECRET: $twitterSecret,
               BETTER_AUTH_URL: $betterAuthUrl,
