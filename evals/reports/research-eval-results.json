@@ -1,0 +1,219 @@
+{
+  "runId": "research-eval-2026-05-23T18-17-28-627Z",
+  "model": "claude-haiku-4-5-20251001",
+  "datasetName": "research/restaurant-concierge-regression",
+  "langfuseStatus": {
+    "enabled": false,
+    "detail": "LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, or LANGFUSE_BASE_URL/LANGFUSE_HOST is not set locally; report generated without posting Langfuse scores."
+  },
+  "results": [
+    {
+      "id": "vague-west-village-date",
+      "name": "Vague neighborhood request discovers anchor options",
+      "input": "Date night in the West Village tonight. Give me a good plan.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcCEcfez36rfwu6zdp\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcCEcfez36rfwu6zdp\"}"
+    },
+    {
+      "id": "specific-start-locks-anchor",
+      "name": "Specific venue locks starting place",
+      "input": "We're starting at Dante. What should we do after?",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcCpbAb8rzmQa6ATBD\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcCpbAb8rzmQa6ATBD\"}"
+    },
+    {
+      "id": "relative-date-uses-date-tool",
+      "name": "Relative date calls date resolver",
+      "input": "I want a Lower East Side bar plan next Friday.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcDfghRcjLCKHWEHA7\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcDfghRcjLCKHWEHA7\"}"
+    },
+    {
+      "id": "confirmed-preferences-trigger-research",
+      "name": "Confirmed anchor plus vibe and distance starts research",
+      "input": "Romantic but not stuffy, 15 minute walk max.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcEPMPaDfRfHr6m6sD\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcEPMPaDfRfHr6m6sD\"}"
+    },
+    {
+      "id": "constraints-preserved",
+      "name": "Budget and dietary constraints are preserved",
+      "input": "Starting at L'Artusi. Vegetarian, not more than $$, chill walkable night.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcEvbKW7ZFTm6PwnRn\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcEvbKW7ZFTm6PwnRn\"}"
+    },
+    {
+      "id": "current-best-new-les",
+      "name": "Current best-new request uses live research",
+      "input": "What are the best new restaurants on the Lower East Side this month?",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcFa2woN15ixf5oQmY\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcFa2woN15ixf5oQmY\"}"
+    },
+    {
+      "id": "non-nyc-does-not-fake-nyc",
+      "name": "Non-NYC location does not silently force NYC",
+      "input": "I'm in Chicago near Logan Square and want a dinner crawl.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcG4Jp6vUcNsFFvPwS\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcG4Jp6vUcNsFFvPwS\"}"
+    },
+    {
+      "id": "uncertain-restaurant-gets-verified",
+      "name": "Possibly fake or stale restaurant details are verified",
+      "input": "Can you build a night around Chez Stardust in Nolita? I heard it just opened.",
+      "outputText": "",
+      "toolCalls": [],
+      "metrics": [
+        {
+          "name": "fatal_error",
+          "score": 0,
+          "detail": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcGXqNbHSFYkf9MyeC\"}"
+        },
+        {
+          "name": "required_tool_use",
+          "score": 0,
+          "detail": "Model call did not complete, so required tool behavior could not be evaluated."
+        },
+        {
+          "name": "flow_adherence",
+          "score": 0,
+          "detail": "Model call did not complete, so flow behavior could not be evaluated."
+        }
+      ],
+      "overall": 0,
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CbKxcGXqNbHSFYkf9MyeC\"}"
+    }
+  ]
+}

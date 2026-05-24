@@ -33,6 +33,13 @@ export class InfraCdkStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    chatTable.addGlobalSecondaryIndex({
+      indexName: 'userId-createdAt-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     const repository = ecr.Repository.fromRepositoryName(this, 'Repository', 'the-crunch');
     const appSecret = secretsmanager.Secret.fromSecretNameV2(this, 'AppSecret', appSecretName);
 

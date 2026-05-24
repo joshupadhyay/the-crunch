@@ -16,6 +16,15 @@ test('deploys serverless web app resources', () => {
 
   template.hasResourceProperties('AWS::DynamoDB::Table', {
     BillingMode: 'PAY_PER_REQUEST',
+    GlobalSecondaryIndexes: Match.arrayWith([
+      Match.objectLike({
+        IndexName: 'userId-createdAt-index',
+        KeySchema: [
+          { AttributeName: 'userId', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' },
+        ],
+      }),
+    ]),
     PointInTimeRecoverySpecification: {
       PointInTimeRecoveryEnabled: true,
     },

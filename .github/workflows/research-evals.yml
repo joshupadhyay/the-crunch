@@ -1,0 +1,46 @@
+name: Research evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Anthropic model to evaluate
+        required: false
+        default: claude-haiku-4-5-20251001
+
+permissions:
+  contents: read
+
+jobs:
+  research-evals:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run research evals
+        env:
+          EVAL_MODEL: ${{ inputs.model }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+          EVAL_FAIL_ON_ERROR: "true"
+          EVAL_MIN_AVERAGE: "0.8"
+        run: bun run eval:research
+
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-eval-report
+          path: |
+            evals/reports/research-eval-report.html
+            evals/reports/research-eval-results.json
+          if-no-files-found: error

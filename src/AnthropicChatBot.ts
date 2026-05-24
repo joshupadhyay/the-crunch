@@ -31,6 +31,8 @@ interface StreamResult {
   stopReason: string | null;
 }
 
+const DEFAULT_MAX_TOOL_ROUNDS = 6;
+
 export class AnthropicChatBot {
   DATABASE: IDatabase;
   readonly client: Anthropic;
@@ -48,32 +50,44 @@ export class AnthropicChatBot {
     });
   }
 
-  async createConversation() {
-    return this.DATABASE.createConversation();
+  async createConversation(userId: string) {
+    return this.DATABASE.createConversation(userId);
   }
 
-  async getMessages(conversationId: string) {
-    return this.DATABASE.getConversation(conversationId);
+  async getMessages(conversationId: string, userId: string) {
+    return this.DATABASE.getConversation(conversationId, userId);
   }
 
   /**
    * Orchestrator — sends a message and streams the response.
    * Loops until Claude stops requesting tools.
    */
-  async *streamMessage(message: Message, conversationId: string) {
+  async *streamMessage(
+    message: Message,
+    conversationId: string,
+    userId: string,
+  ) {
     // User message comes in, push it to the DB immediately
     await this.DATABASE.pushMessage(
       conversationId,
+      userId,
       message.role,
       message.content,
     );
 
     // define the break condition of the while loop
     let stopReason: string | null = "tool_use";
+    let toolRounds = 0;
+    const maxToolRounds = Number(
+      process.env.MAX_TOOL_ROUNDS ?? DEFAULT_MAX_TOOL_ROUNDS,
+    );
 
     // While the conversation is ongoing, pull latest messages, start streaming
     while (stopReason === "tool_use") {
-      const messages = await this.DATABASE.getConversation(conversationId);
+      const messages = await this.DATABASE.getConversation(
+        conversationId,
+        userId,
+      );
 
       const stream = await this.client.messages.create({
         system: SYSTEM_PROMPT,
@@ -89,12 +103,25 @@ export class AnthropicChatBot {
 
       // If the stream pauses for tool use, we handle it. We have many tools with formats!
       if (stopReason === "tool_use" && result.toolCalls.length > 0) {
-        await this.persistAssistantToolUse(conversationId, result);
-        yield* this.executeAndPersistTools(conversationId, result.toolCalls);
+        toolRounds += 1;
+        if (toolRounds > maxToolRounds) {
+          throw new Error(
+            `Tool loop exceeded ${maxToolRounds} rounds. Try narrowing the request.`,
+          );
+        }
+        await this.persistAssistantToolUse(conversationId, userId, result);
+        yield* this.executeAndPersistTools(
+          conversationId,
+          userId,
+          result.toolCalls,
+        );
+      } else if (stopReason === "tool_use") {
+        throw new Error("Assistant requested tool use without a tool call.");
       } else if (result.textContent) {
         // if just text, push the AI's text straight to the DB
         await this.DATABASE.pushMessage(
           conversationId,
+          userId,
           "assistant",
           result.textContent,
         );
@@ -139,10 +166,19 @@ export class AnthropicChatBot {
         }
       } else if (event.type === "content_block_stop") {
         if (currentToolName) {
+          let input: Record<string, unknown>;
+          try {
+            input = JSON.parse(currentToolInput || "{}");
+          } catch {
+            throw new Error(
+              `Assistant sent invalid JSON for ${currentToolName} tool input.`,
+            );
+          }
+
           toolCalls.push({
             name: currentToolName,
             id: currentToolId,
-            input: JSON.parse(currentToolInput || "{}"),
+            input,
           });
           currentToolName = "";
           currentToolId = "";
@@ -165,6 +201,7 @@ export class AnthropicChatBot {
    */
   private async persistAssistantToolUse(
     conversationId: string,
+    userId: string,
     result: StreamResult,
   ) {
     const content: MessageParam["content"] = [];
@@ -181,6 +218,7 @@ export class AnthropicChatBot {
     }
     await this.DATABASE.pushMessage(
       conversationId,
+      userId,
       "assistant",
       JSON.stringify(content),
     );
@@ -192,6 +230,7 @@ export class AnthropicChatBot {
    */
   private async *executeAndPersistTools(
     conversationId: string,
+    userId: string,
     toolCalls: ToolCall[],
   ) {
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
@@ -216,6 +255,7 @@ export class AnthropicChatBot {
     // Anthropic API requires tool_result in user role
     await this.DATABASE.pushMessage(
       conversationId,
+      userId,
       "user",
       JSON.stringify(toolResults),
     );

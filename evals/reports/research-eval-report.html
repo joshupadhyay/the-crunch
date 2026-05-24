@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Crunch Research Eval Report</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f8f4ea; color: #2e2118; }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 56px; }
+    header { display: grid; gap: 10px; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 34px; line-height: 1.05; }
+    h2 { margin: 0 0 12px; font-size: 22px; }
+    .meta { color: #6e5a48; line-height: 1.5; }
+    .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }
+    .tile, .case { background: #fffdf8; border: 1px solid #d8c8b4; border-radius: 8px; box-shadow: 0 1px 3px rgb(46 33 24 / 8%); }
+    .tile { padding: 16px; }
+    .tile strong { display: block; font-size: 28px; }
+    .case { margin: 16px 0; overflow: hidden; }
+    .case-head { display: flex; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid #eadfce; }
+    .case-title { font-weight: 800; }
+    .score { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .pass { color: #196c43; }
+    .fail { color: #a23622; }
+    .body { padding: 16px 18px 18px; display: grid; gap: 14px; }
+    .metrics { width: 100%; border-collapse: collapse; }
+    .metrics th, .metrics td { padding: 9px 8px; border-bottom: 1px solid #efe5d5; text-align: left; vertical-align: top; }
+    .metrics th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #755f4b; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #2e2118; color: #fff9ef; padding: 12px; border-radius: 6px; max-height: 280px; overflow: auto; }
+    code { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
+    .tools { color: #5d4634; }
+    @media (max-width: 800px) { .summary { grid-template-columns: 1fr 1fr; } .case-head { display: grid; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>The Crunch Research Eval Report</h1>
+      <div class="meta">
+        Generated 2026-05-23T18:17:30.183Z with model <code>claude-haiku-4-5-20251001</code>.<br />
+        Dataset: <code>research/restaurant-concierge-regression</code>. Run: <code>research-eval-2026-05-23T18-17-28-627Z</code>.<br />
+        Gate: average >= 80.0%, fatal errors reported only.<br />
+        Langfuse: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, or LANGFUSE_BASE_URL/LANGFUSE_HOST is not set locally; report generated without posting Langfuse scores.
+
+      </div>
+    </header>
+
+    <section class="summary">
+      <div class="tile"><span>Overall</span><strong>0.0%</strong></div>
+      <div class="tile"><span>Passing Cases</span><strong>0/8</strong></div>
+      <div class="tile"><span>Cases</span><strong>8</strong></div>
+      <div class="tile"><span>Pass Bar</span><strong>80%</strong></div>
+    </section>
+
+
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Vague neighborhood request discovers anchor options</div>
+            <div class="meta"><code>vague-west-village-date</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>Date night in the West Village tonight. Give me a good plan.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcCEcfez36rfwu6zdp&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcCEcfez36rfwu6zdp&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Specific venue locks starting place</div>
+            <div class="meta"><code>specific-start-locks-anchor</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>We&#39;re starting at Dante. What should we do after?</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcCpbAb8rzmQa6ATBD&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcCpbAb8rzmQa6ATBD&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Relative date calls date resolver</div>
+            <div class="meta"><code>relative-date-uses-date-tool</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>I want a Lower East Side bar plan next Friday.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcDfghRcjLCKHWEHA7&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcDfghRcjLCKHWEHA7&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Confirmed anchor plus vibe and distance starts research</div>
+            <div class="meta"><code>confirmed-preferences-trigger-research</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>Romantic but not stuffy, 15 minute walk max.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcEPMPaDfRfHr6m6sD&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcEPMPaDfRfHr6m6sD&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Budget and dietary constraints are preserved</div>
+            <div class="meta"><code>constraints-preserved</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>Starting at L&#39;Artusi. Vegetarian, not more than $$, chill walkable night.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcEvbKW7ZFTm6PwnRn&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcEvbKW7ZFTm6PwnRn&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Current best-new request uses live research</div>
+            <div class="meta"><code>current-best-new-les</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>What are the best new restaurants on the Lower East Side this month?</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcFa2woN15ixf5oQmY&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcFa2woN15ixf5oQmY&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Non-NYC location does not silently force NYC</div>
+            <div class="meta"><code>non-nyc-does-not-fake-nyc</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>I&#39;m in Chicago near Logan Square and want a dinner crawl.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcG4Jp6vUcNsFFvPwS&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcG4Jp6vUcNsFFvPwS&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+      <section class="case">
+        <div class="case-head">
+          <div>
+            <div class="case-title">Possibly fake or stale restaurant details are verified</div>
+            <div class="meta"><code>uncertain-restaurant-gets-verified</code></div>
+          </div>
+          <div class="score fail">0.0%</div>
+        </div>
+        <div class="body">
+          <div><strong>Input</strong><pre><code>Can you build a night around Chez Stardust in Nolita? I heard it just opened.</code></pre></div>
+          <div class="tools"><strong>Tool calls:</strong> none</div>
+          <div class="fail"><strong>Error:</strong> 401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcGXqNbHSFYkf9MyeC&quot;}</div>
+          <table class="metrics">
+                  <thead><tr><th>Metric</th><th>Score</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr>
+                          <td><code>fatal_error</code></td>
+                          <td>0.0%</td>
+                          <td>401 {&quot;type&quot;:&quot;error&quot;,&quot;error&quot;:{&quot;type&quot;:&quot;authentication_error&quot;,&quot;message&quot;:&quot;invalid x-api-key&quot;},&quot;request_id&quot;:&quot;req_011CbKxcGXqNbHSFYkf9MyeC&quot;}</td>
+                        </tr><tr>
+                          <td><code>required_tool_use</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so required tool behavior could not be evaluated.</td>
+                        </tr><tr>
+                          <td><code>flow_adherence</code></td>
+                          <td>0.0%</td>
+                          <td>Model call did not complete, so flow behavior could not be evaluated.</td>
+                        </tr>
+                  </tbody>
+                </table>
+
+        </div>
+      </section>
+  </main>
+</body>
+</html>

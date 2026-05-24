@@ -4,6 +4,7 @@ import { AnthropicChatBot } from "./AnthropicChatBot";
 import { createDatabase } from "./databases/createDatabase";
 import type { Message } from "./databases/Database";
 import { auth } from "./auth-client";
+import { captureServerException } from "./observability";
 
 /**
  * Init Chatbot with the configured persistent store.
@@ -15,6 +16,31 @@ export const server = serve({
   port: Number(process.env.PORT ?? 3000),
   routes: {
     "/*": index,
+
+    "/api/client-config": {
+      GET() {
+        return Response.json({
+          sentry: {
+            dsn: process.env.PUBLIC_SENTRY_DSN,
+            environment:
+              process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+            release: process.env.SENTRY_RELEASE,
+            tracesSampleRate: parseSampleRate(
+              "PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
+              0,
+            ),
+            replaysSessionSampleRate: parseSampleRate(
+              "PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE",
+              0,
+            ),
+            replaysOnErrorSampleRate: parseSampleRate(
+              "PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE",
+              0,
+            ),
+          },
+        });
+      },
+    },
 
     "/api/mapbox-token": {
       async GET(req) {
@@ -31,24 +57,29 @@ export const server = serve({
 
     "/api/chat/create": {
       async POST(req) {
-        try { await authCheck(req); }
+        let userId: string;
+        try { userId = await authCheck(req); }
         catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
 
-        const conversation = await chatbot.DATABASE.createConversation();
+        const conversation = await chatbot.DATABASE.createConversation(userId);
         return Response.json(conversation);
       },
     },
 
     "/api/chat/conversations": {
       async GET(req) {
-        try { await authCheck(req); }
+        let userId: string;
+        try { userId = await authCheck(req); }
         catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
 
-        const conversations = await chatbot.DATABASE.getAllConversations();
+        const conversations = await chatbot.DATABASE.getAllConversations(userId);
 
         const result = await Promise.all(
           conversations.map(async (conv) => {
-            const messages = await chatbot.DATABASE.getConversation(conv.id);
+            const messages = await chatbot.DATABASE.getConversation(
+              conv.id,
+              userId,
+            );
             const firstUserMsg = messages.find((m) => m.role === "user");
             const preview = firstUserMsg
               ? firstUserMsg.content.slice(0, 60)
@@ -68,12 +99,13 @@ export const server = serve({
 
     "/api/chat/conversations/:id": {
       async GET(req) {
-        try { await authCheck(req); }
+        let userId: string;
+        try { userId = await authCheck(req); }
         catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
 
         const id = req.params.id;
         try {
-          const resp = await chatbot.DATABASE.getConversation(id);
+          const resp = await chatbot.DATABASE.getConversation(id, userId);
           const messages = toDisplayMessages(resp);
           return Response.json(messages);
         } catch {
@@ -89,7 +121,8 @@ export const server = serve({
 
     "/api/chat/send": {
       async POST(req) {
-        try { await authCheck(req); }
+        let userId: string;
+        try { userId = await authCheck(req); }
         catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
 
         const body = await req.json();
@@ -105,6 +138,7 @@ export const server = serve({
               for await (const chunk of chatbot.streamMessage(
                 { role: "user", content: message }, // take message from user and pass it to ChatBot
                 conversationId,
+                userId,
               )) {
                 // We take the output from the chatbot, and stringify it...
                 controller.enqueue(
@@ -112,6 +146,11 @@ export const server = serve({
                 );
               }
             } catch (err: any) {
+              captureServerException(err, {
+                route: "/api/chat/send",
+                conversationId,
+              });
+
               // Send error as a stream chunk so the frontend can display it
               controller.enqueue(
                 new TextEncoder().encode(
@@ -181,7 +220,18 @@ function toDisplayMessages(messages: Message[]): Message[] {
 async function authCheck(req: Request) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session) {
+  if (!session?.user?.id) {
     throw new Error("401 unauthorized");
   }
+
+  return session.user.id;
+}
+
+function parseSampleRate(name: string, fallback: number) {
+  const value = process.env[name];
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, 0), 1);
 }

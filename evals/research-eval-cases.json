@@ -1,0 +1,108 @@
+[
+  {
+    "id": "vague-west-village-date",
+    "name": "Vague neighborhood request discovers anchor options",
+    "input": "Date night in the West Village tonight. Give me a good plan.",
+    "expected": {
+      "requiredTools": ["web_search"],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": ["pick|choose|which", "West Village"],
+      "forbiddenText": ["party size", "reservation time"],
+      "contextKeys": []
+    }
+  },
+  {
+    "id": "specific-start-locks-anchor",
+    "name": "Specific venue locks starting place",
+    "input": "We're starting at Dante. What should we do after?",
+    "expected": {
+      "requiredTools": [],
+      "forbiddenTools": ["web_search", "geocode_venues"],
+      "requiredText": ["Dante", "vibe", "distance|far|walk|cab|subway"],
+      "forbiddenText": ["party size", "what time", "reservation"],
+      "contextKeys": ["startPlace"]
+    }
+  },
+  {
+    "id": "relative-date-uses-date-tool",
+    "name": "Relative date calls date resolver",
+    "input": "I want a Lower East Side bar plan next Friday.",
+    "expected": {
+      "requiredTools": ["determine_date"],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": [],
+      "forbiddenText": ["I cannot"],
+      "contextKeys": []
+    }
+  },
+  {
+    "id": "confirmed-preferences-trigger-research",
+    "name": "Confirmed anchor plus vibe and distance starts research",
+    "messages": [
+      {
+        "role": "user",
+        "content": "We're starting at Attaboy."
+      },
+      {
+        "role": "assistant",
+        "content": "Right on. Attaboy is the anchor. What kind of night are we building, and how far are you willing to go?\n\n<!--context\n{\"startPlace\":{\"name\":\"Attaboy\",\"neighborhood\":\"Lower East Side\",\"city\":\"New York\"}}\n-->"
+      }
+    ],
+    "input": "Romantic but not stuffy, 15 minute walk max.",
+    "expected": {
+      "requiredTools": ["web_search"],
+      "forbiddenTools": [],
+      "requiredText": [],
+      "forbiddenText": ["party size", "reservation"],
+      "contextKeys": []
+    }
+  },
+  {
+    "id": "constraints-preserved",
+    "name": "Budget and dietary constraints are preserved",
+    "input": "Starting at L'Artusi. Vegetarian, not more than $$, chill walkable night.",
+    "expected": {
+      "requiredTools": [],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": ["L'Artusi|L’Artusi", "vegetarian", "\\$\\$|budget", "walk"],
+      "forbiddenText": ["party size", "reservation"],
+      "contextKeys": ["startPlace", "preferences"]
+    }
+  },
+  {
+    "id": "current-best-new-les",
+    "name": "Current best-new request uses live research",
+    "input": "What are the best new restaurants on the Lower East Side this month?",
+    "expected": {
+      "requiredTools": ["web_search"],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": [],
+      "forbiddenText": ["as of my last update"],
+      "contextKeys": []
+    }
+  },
+  {
+    "id": "non-nyc-does-not-fake-nyc",
+    "name": "Non-NYC location does not silently force NYC",
+    "input": "I'm in Chicago near Logan Square and want a dinner crawl.",
+    "expected": {
+      "requiredTools": [],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": ["Chicago|Logan Square"],
+      "forbiddenText": ["West Village", "Lower East Side", "NYC"],
+      "contextKeys": []
+    }
+  },
+  {
+    "id": "uncertain-restaurant-gets-verified",
+    "name": "Possibly fake or stale restaurant details are verified",
+    "input": "Can you build a night around Chez Stardust in Nolita? I heard it just opened.",
+    "expected": {
+      "requiredTools": ["web_search"],
+      "forbiddenTools": ["geocode_venues"],
+      "requiredText": [],
+      "forbiddenText": ["definitely", "obviously"],
+      "contextKeys": []
+    }
+  }
+]

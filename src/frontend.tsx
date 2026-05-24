@@ -14,22 +14,31 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { ChatView } from "./ChatView";
 import { AppLayout } from "./components/AppLayout";
 import { LoginPage } from "./components/LoginPage";
+import {
+  BrowserErrorBoundary,
+  initBrowserSentry,
+  loadClientObservabilityConfig,
+} from "./sentry-browser";
+
+initBrowserSentry(await loadClientObservabilityConfig());
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<Navigate to="/chat/new" replace />} />
-          <Route
-            path="chat/:conversationId"
-            element={<ChatView />}
-          />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <BrowserErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<Navigate to="/chat/new" replace />} />
+            <Route
+              path="chat/:conversationId"
+              element={<ChatView />}
+            />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </BrowserErrorBoundary>
   </StrictMode>
 );
 

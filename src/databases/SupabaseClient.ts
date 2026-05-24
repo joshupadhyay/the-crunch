@@ -25,11 +25,10 @@ export class SupabaseDB implements IDatabase {
     return new SupabaseDB(client);
   }
 
-  async createConversation(): Promise<Conversation> {
+  async createConversation(userId: string): Promise<Conversation> {
     const { data, error } = await this.client
       .from("conversations")
-      // TODO – WHEN WE HAVE AUTH WE MUST CHANGE THIS
-      .insert({ user_id: "00000000-0000-0000-0000-000000000000" })
+      .insert({ user_id: userId })
       .select("id, created_at")
       .single();
 
@@ -37,10 +36,11 @@ export class SupabaseDB implements IDatabase {
     return { id: data.id, createdAt: data.created_at };
   }
 
-  async getAllConversations(): Promise<Conversation[]> {
+  async getAllConversations(userId: string): Promise<Conversation[]> {
     const { data, error } = await this.client
       .from("conversations")
       .select("id, created_at")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false }); // show oldest on top
 
     if (error) throw error;
@@ -48,11 +48,15 @@ export class SupabaseDB implements IDatabase {
   }
 
   /** @returns Message[] for entire conversation */
-  async getConversation(conversationId: string): Promise<Message[]> {
+  async getConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<Message[]> {
     const { data, error } = await this.client
       .from("messages")
-      .select("role, content")
+      .select("role, content, conversations!inner(user_id)")
       .eq("conversation_id", conversationId)
+      .eq("conversations.user_id", userId)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
@@ -67,9 +71,12 @@ export class SupabaseDB implements IDatabase {
 
   async pushMessage(
     id: string,
+    userId: string,
     role: "user" | "assistant",
     content: string,
   ): Promise<Message[]> {
+    await this.getConversation(id, userId);
+
     const { error } = await this.client.from("messages").insert({
       conversation_id: id,
       role,
@@ -77,6 +84,6 @@ export class SupabaseDB implements IDatabase {
     });
 
     if (error) throw error;
-    return this.getConversation(id);
+    return this.getConversation(id, userId);
   }
 }

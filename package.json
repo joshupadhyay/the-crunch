@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "bun --hot src/index.tsx",
     "start": "NODE_ENV=production bun src/index.tsx",
-    "build": "bun run build.ts"
+    "build": "bun run build.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test src",
+    "check": "bun run typecheck && bun test src && bun run build",
+    "check:infra": "cd infra-cdk && npm test -- --runInBand && npm run build",
+    "eval:research": "bun evals/research-evals.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
@@ -20,6 +25,8 @@
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.2.3",
+    "@sentry/bun": "^10.53.1",
+    "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.95.3",
     "@types/pg": "^8.16.0",
     "better-auth": "^1.4.18",

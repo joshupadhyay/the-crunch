@@ -13,6 +13,7 @@ type ConversationItem = {
   sk: "META";
   entityType: "conversation";
   id: string;
+  userId: string;
   createdAt: string;
 };
 
@@ -45,14 +46,15 @@ export class DynamoDBDB implements IDatabase {
     return new DynamoDBDB(tableName, client);
   }
 
-  async createConversation(): Promise<Conversation> {
+  async createConversation(userId: string): Promise<Conversation> {
     const id = randomUUIDv7().toString();
     const createdAt = new Date().toISOString();
     const item: ConversationItem = {
-      pk: this.conversationPk(id),
+      pk: this.conversationPk(id, userId),
       sk: "META",
       entityType: "conversation",
       id,
+      userId,
       createdAt,
     };
 
@@ -67,13 +69,16 @@ export class DynamoDBDB implements IDatabase {
     return { id, createdAt };
   }
 
-  async getConversation(conversationId: string): Promise<Message[]> {
+  async getConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<Message[]> {
     const result = await this.client.send(
       new QueryCommand({
         TableName: this.tableName,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :messagePrefix)",
         ExpressionAttributeValues: {
-          ":pk": this.conversationPk(conversationId),
+          ":pk": this.conversationPk(conversationId, userId),
           ":messagePrefix": "MSG#",
         },
         ScanIndexForward: true,
@@ -86,13 +91,15 @@ export class DynamoDBDB implements IDatabase {
     });
   }
 
-  async getAllConversations(): Promise<Conversation[]> {
+  async getAllConversations(userId: string): Promise<Conversation[]> {
     const result = await this.client.send(
       new QueryCommand({
         TableName: this.tableName,
-        IndexName: "entityType-createdAt-index",
-        KeyConditionExpression: "entityType = :entityType",
-        ExpressionAttributeValues: { ":entityType": "conversation" },
+        IndexName: "userId-createdAt-index",
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+        },
         ScanIndexForward: false,
       }),
     );
@@ -105,13 +112,14 @@ export class DynamoDBDB implements IDatabase {
 
   async pushMessage(
     id: string,
+    userId: string,
     role: Message["role"],
     content: string,
   ): Promise<Message[]> {
     const createdAt = new Date().toISOString();
     const messageId = randomUUIDv7().toString();
     const item: MessageItem = {
-      pk: this.conversationPk(id),
+      pk: this.conversationPk(id, userId),
       sk: `MSG#${createdAt}#${messageId}`,
       entityType: "message",
       role,
@@ -126,15 +134,15 @@ export class DynamoDBDB implements IDatabase {
       }),
     );
 
-    return this.getConversation(id);
+    return this.getConversation(id, userId);
   }
 
-  async deleteConversation(id: string): Promise<void> {
+  async deleteConversation(id: string, userId: string): Promise<void> {
     const messages = await this.client.send(
       new QueryCommand({
         TableName: this.tableName,
         KeyConditionExpression: "pk = :pk",
-        ExpressionAttributeValues: { ":pk": this.conversationPk(id) },
+        ExpressionAttributeValues: { ":pk": this.conversationPk(id, userId) },
       }),
     );
 
@@ -150,7 +158,7 @@ export class DynamoDBDB implements IDatabase {
     );
   }
 
-  private conversationPk(id: string) {
-    return `CONVERSATION#${id}`;
+  private conversationPk(id: string, userId: string) {
+    return `USER#${userId}#CONVERSATION#${id}`;
   }
 }

@@ -154,7 +154,9 @@ export function ChatView() {
           const parsed = JSON.parse(line);
 
           if (parsed.type === "error") {
-            throw new Error(parsed.error ?? "The assistant hit an error.");
+            throw new Error(
+              parsed.message ?? parsed.error ?? "The assistant hit an error.",
+            );
           } else if (parsed.type === "text") {
             assistantText += parsed.text.text;
           } else if (parsed.type === "tool_use_start") {

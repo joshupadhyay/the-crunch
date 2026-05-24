@@ -21,6 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate app before deploy
+        run: bun run check
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -59,6 +68,14 @@ jobs:
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: production
+          SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE }}
+          PUBLIC_SENTRY_DSN: ${{ secrets.PUBLIC_SENTRY_DSN }}
+          PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.PUBLIC_SENTRY_TRACES_SAMPLE_RATE }}
+          PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE: ${{ secrets.PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE }}
+          PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE: ${{ secrets.PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE }}
         run: |
           EXISTING_SECRET="$(aws secretsmanager get-secret-value \
             --secret-id "$APP_SECRET_NAME" \
@@ -91,6 +108,14 @@ jobs:
             --arg langfusePublic "$LANGFUSE_PUBLIC_KEY" \
             --arg langfuseSecret "$LANGFUSE_SECRET_KEY" \
             --arg langfuseBaseUrl "$LANGFUSE_BASE_URL" \
+            --arg sentryDsn "$SENTRY_DSN" \
+            --arg sentryEnvironment "$SENTRY_ENVIRONMENT" \
+            --arg sentryRelease "$SENTRY_RELEASE" \
+            --arg sentryTracesSampleRate "$SENTRY_TRACES_SAMPLE_RATE" \
+            --arg publicSentryDsn "$PUBLIC_SENTRY_DSN" \
+            --arg publicSentryTracesSampleRate "$PUBLIC_SENTRY_TRACES_SAMPLE_RATE" \
+            --arg publicSentryReplaysSessionSampleRate "$PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE" \
+            --arg publicSentryReplaysOnErrorSampleRate "$PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE" \
             '$existing * ({
               ANTHROPIC_API_KEY: $anthropic,
               DATABASE_URL: $database,
@@ -103,7 +128,15 @@ jobs:
               BETTER_AUTH_SECRET: $betterAuthSecret,
               LANGFUSE_PUBLIC_KEY: $langfusePublic,
               LANGFUSE_SECRET_KEY: $langfuseSecret,
-              LANGFUSE_BASE_URL: $langfuseBaseUrl
+              LANGFUSE_BASE_URL: $langfuseBaseUrl,
+              SENTRY_DSN: $sentryDsn,
+              SENTRY_ENVIRONMENT: $sentryEnvironment,
+              SENTRY_RELEASE: $sentryRelease,
+              SENTRY_TRACES_SAMPLE_RATE: $sentryTracesSampleRate,
+              PUBLIC_SENTRY_DSN: $publicSentryDsn,
+              PUBLIC_SENTRY_TRACES_SAMPLE_RATE: $publicSentryTracesSampleRate,
+              PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE: $publicSentryReplaysSessionSampleRate,
+              PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE: $publicSentryReplaysOnErrorSampleRate
             } | with_entries(select(.value != "")))')"
 
           aws secretsmanager describe-secret --secret-id "$APP_SECRET_NAME" >/dev/null 2>&1 \
@@ -113,6 +146,10 @@ jobs:
       - name: Install CDK dependencies
         working-directory: infra-cdk
         run: npm ci
+
+      - name: Validate CDK before deploy
+        working-directory: infra-cdk
+        run: npm test -- --runInBand && npm run build
 
       - name: Deploy serverless stack
         working-directory: infra-cdk
