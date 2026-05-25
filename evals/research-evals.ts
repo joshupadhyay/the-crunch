@@ -36,7 +36,12 @@ type CaseResult = {
   error?: string;
 };
 
-const MODEL = process.env.EVAL_MODEL ?? "claude-haiku-4-5-20251001";
+const MODEL =
+  process.env.EVAL_MODEL ??
+  process.env.LLM_MODEL ??
+  (process.env.OPENROUTER_API_KEY
+    ? "deepseek/deepseek-v4-pro"
+    : "claude-haiku-4-5-20251001");
 const DATASET_NAME = "research/restaurant-concierge-regression";
 const RUN_ID = `research-eval-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 const REPORT_DIR = "evals/reports";
@@ -199,8 +204,11 @@ function errorMetrics(error: string): MetricResult[] {
 }
 
 async function runCase(testCase: EvalCase): Promise<CaseResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    const error = "ANTHROPIC_API_KEY is not set; live model evaluation skipped.";
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!openRouterKey && !anthropicKey) {
+    const error =
+      "OPENROUTER_API_KEY or ANTHROPIC_API_KEY is required; live model evaluation skipped.";
     return {
       id: testCase.id,
       name: testCase.name,
@@ -216,7 +224,22 @@ async function runCase(testCase: EvalCase): Promise<CaseResult> {
   try {
     await import("../src/observability");
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic(
+      openRouterKey
+        ? {
+            apiKey: null,
+            authToken: openRouterKey,
+            baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api",
+            defaultHeaders: {
+              "HTTP-Referer":
+                process.env.OPENROUTER_HTTP_REFERER ??
+                "https://d2w56c6hcnyw72.cloudfront.net",
+              "X-OpenRouter-Title":
+                process.env.OPENROUTER_APP_TITLE ?? "The Crunch",
+            },
+          }
+        : { apiKey: anthropicKey },
+    );
     const messages: MessageParam[] = [
       ...(testCase.messages ?? []),
       { role: "user", content: testCase.input },
