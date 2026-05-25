@@ -56,8 +56,8 @@ jobs:
 
       - name: Upsert runtime secrets
         env:
-          LLM_PROVIDER: openrouter
-          LLM_MODEL: deepseek/deepseek-v4-pro
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_HTTP_REFERER: ${{ secrets.BETTER_AUTH_URL }}
           OPENROUTER_APP_TITLE: The Crunch
@@ -202,6 +202,7 @@ jobs:
 
           curl --fail --show-error --silent --max-time 60 -D /tmp/the-crunch-headers.txt "$APP_URL/" >/tmp/the-crunch-home.html
           cat /tmp/the-crunch-headers.txt
+          grep -qi "^content-type: text/html" /tmp/the-crunch-headers.txt
           grep -q "The Crunch" /tmp/the-crunch-home.html
 
           status="$(curl --show-error --silent --max-time 60 \

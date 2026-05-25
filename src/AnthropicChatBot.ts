@@ -45,19 +45,46 @@ const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-pro";
 
-function resolveModelProvider() {
-  const provider =
-    process.env.LLM_PROVIDER ??
-    (process.env.OPENROUTER_API_KEY
-      ? "openrouter"
-      : process.env.DEEPSEEK_API_KEY
-        ? "deepseek"
-        : "anthropic");
+type ModelProvider = "openrouter" | "deepseek" | "anthropic";
+type ModelProviderConfig = {
+  model: string;
+  clientOptions: ConstructorParameters<typeof Anthropic>[0];
+};
+
+function availableProvider(preferred?: string): ModelProvider {
+  if (preferred === "openrouter" && process.env.OPENROUTER_API_KEY) {
+    return "openrouter";
+  }
+  if (preferred === "deepseek" && process.env.DEEPSEEK_API_KEY) {
+    return "deepseek";
+  }
+  if (preferred === "anthropic" && process.env.ANTHROPIC_API_KEY) {
+    return "anthropic";
+  }
+  if (process.env.OPENROUTER_API_KEY) return "openrouter";
+  if (process.env.DEEPSEEK_API_KEY) return "deepseek";
+  return "anthropic";
+}
+
+function resolveModelProvider(): ModelProviderConfig {
+  const requestedProvider = process.env.LLM_PROVIDER?.trim();
+  if (
+    requestedProvider &&
+    !["openrouter", "deepseek", "anthropic"].includes(requestedProvider)
+  ) {
+    throw new Error(
+      `Unsupported LLM_PROVIDER "${requestedProvider}". Use openrouter, deepseek, or anthropic.`,
+    );
+  }
+
+  const provider = availableProvider(requestedProvider);
 
   if (provider === "openrouter") {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error("LLM_PROVIDER=openrouter requires OPENROUTER_API_KEY.");
+      throw new Error(
+        "OpenRouter is configured but OPENROUTER_API_KEY is missing, and no fallback LLM key is set.",
+      );
     }
 
     return {
@@ -83,7 +110,9 @@ function resolveModelProvider() {
   if (provider === "deepseek") {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
-      throw new Error("LLM_PROVIDER=deepseek requires DEEPSEEK_API_KEY.");
+      throw new Error(
+        "DeepSeek is configured but DEEPSEEK_API_KEY is missing, and no fallback LLM key is set.",
+      );
     }
 
     return {
@@ -95,12 +124,6 @@ function resolveModelProvider() {
           "https://api.deepseek.com/anthropic",
       } satisfies ConstructorParameters<typeof Anthropic>[0],
     };
-  }
-
-  if (provider !== "anthropic") {
-    throw new Error(
-      `Unsupported LLM_PROVIDER "${provider}". Use openrouter, deepseek, or anthropic.`,
-    );
   }
 
   return {
