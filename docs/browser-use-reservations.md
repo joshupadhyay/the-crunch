@@ -46,6 +46,35 @@ bun run reservation:probe -- \
 
 Reports are written to `artifacts/browser-use/` and are ignored by git.
 
+## Cloud Stealth Probe
+
+Browser Use does support an "undetectable" browser, but it is part of Browser
+Use Cloud rather than the plain local open-source Chromium path.
+
+Set a Browser Use Cloud API key:
+
+```sh
+BROWSER_USE_API_KEY=bu_...
+```
+
+Then rerun a probe with the cloud stealth browser and a US residential proxy:
+
+```sh
+bun run reservation:probe -- \
+  --cloud \
+  --proxy-country us \
+  --platform opentable \
+  --restaurant "L'Artusi" \
+  --location "New York, NY" \
+  --date 2026-06-05 \
+  --time "8:00 PM" \
+  --party-size 2
+```
+
+Browser Use Cloud claims stealth is enabled by default for every cloud browser:
+anti-fingerprint Chromium, cookie/ad banner blocking, Cloudflare/anti-bot
+bypass, captcha solving, and residential proxies.
+
 ## Guardrails
 
 The probe prompt explicitly forbids:
@@ -74,12 +103,19 @@ The intended output is availability evidence, not a completed booking.
 - DeepSeek can run Browser Use, but for these booking sites it is slower than we
   want and sometimes repeats unproductive DOM clicks. For product use, compare
   it against `ChatBrowserUse()` or a stronger browser-control model.
+- The next necessary experiment is the same OpenTable/Resy probe with
+  `--cloud`, because the local browser is not the undetectable browser Browser
+  Use markets. Without Browser Use Cloud, we are testing normal Playwright-like
+  automation against heavy bot defenses.
 
 ## Production Recommendation
 
 Do not put Browser Use inside the current Lambda web container. Use a separate worker:
 
 - AWS ECS Fargate task or AWS Batch job for the easiest Chromium runtime.
+- If Browser Use Cloud works on Resy/OpenTable, prefer that over self-hosting
+  Chromium initially. It already bundles stealth Chromium, residential proxies,
+  captcha handling, recordings, live preview, and an API key boundary.
 - SQS queue from the chat app to the worker.
 - DynamoDB table item for job status and result payload.
 - S3 for screenshots/history traces if we want auditability.

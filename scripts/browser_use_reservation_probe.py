@@ -119,6 +119,8 @@ async def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is required for this experiment.")
+    if args.cloud and not os.getenv("BROWSER_USE_API_KEY"):
+        raise RuntimeError("BROWSER_USE_API_KEY is required when --cloud is enabled.")
 
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -128,6 +130,8 @@ async def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     llm = ChatLiteLLM(model=model, api_key=api_key, temperature=0.0)
     browser = Browser(
         headless=args.headless,
+        use_cloud=args.cloud,
+        cloud_proxy_country_code=args.proxy_country if args.cloud else None,
         allowed_domains=platform_domains(args.platform),
         downloads_path=ARTIFACT_DIR / "downloads",
         traces_dir=ARTIFACT_DIR / "traces",
@@ -161,6 +165,8 @@ async def run_probe(args: argparse.Namespace) -> dict[str, Any]:
             "date": args.date,
             "time": args.time,
             "partySize": args.party_size,
+            "cloudBrowser": args.cloud,
+            "proxyCountry": args.proxy_country if args.cloud else None,
             "success": history.is_successful(),
             "steps": history.number_of_steps(),
             "durationSeconds": history.total_duration_seconds(),
@@ -189,6 +195,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=18)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--headed", action="store_true", help="Show the browser window.")
+    parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Use Browser Use Cloud's stealth browser. Requires BROWSER_USE_API_KEY.",
+    )
+    parser.add_argument(
+        "--proxy-country",
+        default="us",
+        help="Browser Use Cloud residential proxy country code. Used only with --cloud.",
+    )
     args = parser.parse_args()
     args.headless = not args.headed
     return args
