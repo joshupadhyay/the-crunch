@@ -60,10 +60,9 @@ BROWSER_USE_API_KEY=bu_...
 Then rerun a probe with the cloud stealth browser and a US residential proxy:
 
 ```sh
-bun run reservation:probe -- \
-  --cloud \
+bun run reservation:probe:cloud -- \
   --proxy-country us \
-  --platform opentable \
+  --platform OpenTable \
   --restaurant "L'Artusi" \
   --location "New York, NY" \
   --date 2026-06-05 \
@@ -74,6 +73,10 @@ bun run reservation:probe -- \
 Browser Use Cloud claims stealth is enabled by default for every cloud browser:
 anti-fingerprint Chromium, cookie/ad banner blocking, Cloudflare/anti-bot
 bypass, captcha solving, and residential proxies.
+
+Prefer `reservation:probe:cloud` for production-path experiments. It uses the
+Browser Use Cloud SDK v3 directly. The older `reservation:probe --cloud` path
+still runs through the open-source Python package wrapper.
 
 ## Guardrails
 
@@ -107,6 +110,13 @@ The intended output is availability evidence, not a completed booking.
   `--cloud`, because the local browser is not the undetectable browser Browser
   Use markets. Without Browser Use Cloud, we are testing normal Playwright-like
   automation against heavy bot defenses.
+- Browser Use Cloud v3 materially improved OpenTable: the same L'Artusi query
+  got past the prior `403 Access Denied`, found the OpenTable restaurant page,
+  and returned the blocker that L'Artusi is not available on OpenTable and
+  should be checked on Resy instead.
+- Browser Use Cloud v3 successfully checked L'Artusi on Resy for
+  `2026-06-05`, party size `2`. It found lunch availability and late-night
+  alternatives (`11:00 PM`, `11:15 PM`), but no 8:00 PM slot.
 
 ## Production Recommendation
 

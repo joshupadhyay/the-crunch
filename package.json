@@ -12,7 +12,8 @@
     "check": "bun run typecheck && bun test src && bun run build",
     "check:infra": "cd infra-cdk && npm test -- --runInBand && npm run build",
     "eval:research": "bun evals/research-evals.ts",
-    "reservation:probe": "uv run scripts/browser_use_reservation_probe.py"
+    "reservation:probe": "uv run scripts/browser_use_reservation_probe.py",
+    "reservation:probe:cloud": "uv run scripts/browser_use_cloud_reservation_probe.py"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
