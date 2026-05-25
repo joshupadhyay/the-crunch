@@ -210,6 +210,20 @@ export function LoginPage() {
           <div className="flex-1 h-px bg-crunch-khaki-300" />
         </div>
 
+        <button
+          type="button"
+          onClick={() => navigate("/try/new")}
+          disabled={isBusy}
+          className="mt-4 w-full px-4 py-2.5 rounded-lg font-body font-semibold
+            text-crunch-walnut-800 bg-crunch-cream border border-crunch-walnut-200
+            hover:bg-crunch-walnut-100 active:bg-crunch-walnut-200
+            disabled:opacity-60 disabled:cursor-not-allowed
+            transition-[background-color,transform,box-shadow] duration-200 cursor-pointer
+            enabled:hover:-translate-y-0.5 enabled:hover:shadow-md"
+        >
+          Try it out
+        </button>
+
         {/* twitter / X sign-in */}
         <button
           type="button"

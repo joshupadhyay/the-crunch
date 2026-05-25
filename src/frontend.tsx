@@ -36,6 +36,13 @@ const app = (
               element={<ChatView />}
             />
           </Route>
+          <Route path="/try" element={<AppLayout mode="trial" />}>
+            <Route index element={<Navigate to="/try/new" replace />} />
+            <Route
+              path=":conversationId"
+              element={<ChatView mode="trial" />}
+            />
+          </Route>
         </Routes>
       </BrowserRouter>
     </BrowserErrorBoundary>

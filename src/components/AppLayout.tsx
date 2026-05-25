@@ -4,10 +4,12 @@ import { authClient } from "@/lib/auth-client";
 import { useCallback, useState } from "react";
 import { Navigate, Outlet } from "react-router";
 
+type AppLayoutMode = "authenticated" | "trial";
+
 /**
  * Homepage of application. Contains sidebar and ChatView elements which are selectively rerendered via Outlet
  */
-export function AppLayout() {
+export function AppLayout({ mode = "authenticated" }: { mode?: AppLayoutMode }) {
   const { data: session, isPending: pending } = authClient.useSession();
   const [boardExpanded, setBoardExpanded] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -68,7 +70,9 @@ export function AppLayout() {
     [boardExpanded],
   );
 
-  if (pending) {
+  const isTrial = mode === "trial";
+
+  if (!isTrial && pending) {
     return (
       <>
         <div className="room-ambience" />
@@ -88,7 +92,7 @@ export function AppLayout() {
     );
   }
 
-  if (!session) {
+  if (!isTrial && !session) {
     return <Navigate to={"/login"} />;
   }
 
@@ -105,6 +109,7 @@ export function AppLayout() {
             context={{
               onToggleBoard: () => setBoardExpanded((prev) => !prev),
               onContextUpdate: handleContextUpdate,
+              isTrial,
             }}
           />
         </main>

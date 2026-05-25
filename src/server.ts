@@ -6,6 +6,8 @@ import type { Message } from "./databases/Database";
 import { auth } from "./auth-client";
 import { captureServerException } from "./observability";
 
+const TRIAL_MESSAGE_LIMIT = 15;
+
 /**
  * Init Chatbot with the configured persistent store.
  */
@@ -114,9 +116,17 @@ export const server = serve({
       },
     },
 
-    // Let BetterAuth handle the auth for us!
-    "/api/auth/*": async (req) => {
-      return auth.handler(req);
+    // Let BetterAuth handle the auth for us.
+    "/api/auth/*": {
+      OPTIONS(req) {
+        return authPreflight(req);
+      },
+      GET(req) {
+        return auth.handler(req);
+      },
+      POST(req) {
+        return auth.handler(req);
+      },
     },
 
     "/api/chat/send": {
@@ -139,6 +149,16 @@ export const server = serve({
                 { role: "user", content: message }, // take message from user and pass it to ChatBot
                 conversationId,
                 userId,
+                {
+                  userId,
+                  sessionId: conversationId,
+                  traceName: "authenticated-chat-message",
+                  tags: ["authenticated"],
+                  metadata: {
+                    chatId: conversationId,
+                    chatType: "authenticated",
+                  },
+                },
               )) {
                 // We take the output from the chatbot, and stringify it...
                 controller.enqueue(
@@ -175,6 +195,118 @@ export const server = serve({
          * We are STREAMING - we can't just return an object. But Response can accept a streaming object
          */
         // return await chatbot.streamMessage(message, conversationId);
+      },
+    },
+
+    "/api/trial/chat/create": {
+      async POST(req) {
+        const body = await req.json().catch(() => ({}));
+        const trialId = getTrialId(req, body);
+        if (!trialId) {
+          return Response.json({ error: "Missing trial id" }, { status: 400 });
+        }
+
+        const userId = trialUserId(trialId);
+        const existing = await chatbot.DATABASE.getAllConversations(userId);
+        if (existing[0]) return Response.json(existing[0]);
+
+        const conversation = await chatbot.DATABASE.createConversation(userId);
+        return Response.json(conversation);
+      },
+    },
+
+    "/api/trial/chat/conversations/:id": {
+      async GET(req) {
+        const trialId = getTrialId(req);
+        if (!trialId) {
+          return Response.json({ error: "Missing trial id" }, { status: 400 });
+        }
+
+        try {
+          const resp = await chatbot.DATABASE.getConversation(
+            req.params.id,
+            trialUserId(trialId),
+          );
+          return Response.json(toDisplayMessages(resp));
+        } catch {
+          return Response.json({ error: "Not found" }, { status: 404 });
+        }
+      },
+    },
+
+    "/api/trial/chat/send": {
+      async POST(req) {
+        const body = await req.json().catch(() => ({}));
+        const trialId = getTrialId(req, body);
+        const { message, conversationId } = body;
+
+        if (!trialId || typeof message !== "string" || typeof conversationId !== "string") {
+          return Response.json({ error: "Invalid trial request" }, { status: 400 });
+        }
+
+        const userId = trialUserId(trialId);
+        const history = await chatbot.DATABASE.getConversation(conversationId, userId);
+        const usedMessages = history.filter((msg) => msg.role === "user" && !isToolResultMessage(msg)).length;
+
+        if (usedMessages >= TRIAL_MESSAGE_LIMIT) {
+          return Response.json(
+            {
+              error: `Trial limit reached. Sign up to keep chatting after ${TRIAL_MESSAGE_LIMIT} messages.`,
+              limit: TRIAL_MESSAGE_LIMIT,
+              used: usedMessages,
+            },
+            { status: 429 },
+          );
+        }
+
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              for await (const chunk of chatbot.streamMessage(
+                { role: "user", content: message },
+                conversationId,
+                userId,
+                {
+                  userId,
+                  sessionId: `trial:${trialId}`,
+                  traceName: "trial-chat-message",
+                  tags: ["trial"],
+                  metadata: {
+                    chatId: conversationId,
+                    chatType: "trial",
+                    trialId,
+                    trialMessageLimit: String(TRIAL_MESSAGE_LIMIT),
+                    trialMessageNumber: String(usedMessages + 1),
+                  },
+                },
+              )) {
+                controller.enqueue(
+                  new TextEncoder().encode(JSON.stringify(chunk) + "\n"),
+                );
+              }
+            } catch (err: any) {
+              captureServerException(err, {
+                route: "/api/trial/chat/send",
+                conversationId,
+                trialId,
+              });
+              controller.enqueue(
+                new TextEncoder().encode(
+                  JSON.stringify({
+                    type: "error",
+                    message: err.message ?? "Something went wrong",
+                  }) + "\n",
+                ),
+              );
+            }
+
+            controller.close();
+          },
+        });
+
+        return new Response(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
       },
     },
   },
@@ -234,4 +366,57 @@ function parseSampleRate(name: string, fallback: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(parsed, 0), 1);
+}
+
+function getTrialId(req: Request, body?: Record<string, unknown>) {
+  const trialId = req.headers.get("x-trial-id") ?? body?.trialId;
+  if (typeof trialId !== "string") return undefined;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trialId)) {
+    return undefined;
+  }
+  return trialId;
+}
+
+function trialUserId(trialId: string) {
+  return `trial:${trialId}`;
+}
+
+function isToolResultMessage(message: Message) {
+  try {
+    const parsed = JSON.parse(message.content);
+    return Array.isArray(parsed) && parsed.every((block) => block?.type === "tool_result");
+  } catch {
+    return false;
+  }
+}
+
+function authPreflight(req: Request) {
+  const origin = req.headers.get("origin");
+  const headers = new Headers({
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers":
+      req.headers.get("access-control-request-headers") ??
+      "content-type,authorization",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "600",
+  });
+
+  if (origin && isTrustedBrowserOrigin(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.append("Vary", "Origin");
+  }
+
+  return new Response(null, { status: 204, headers });
+}
+
+function isTrustedBrowserOrigin(origin: string) {
+  if (origin === "http://localhost:3000") return true;
+  if (origin === process.env.BETTER_AUTH_URL) return true;
+
+  return (
+    process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
+      .map((candidate) => candidate.trim())
+      .filter(Boolean)
+      .includes(origin) ?? false
+  );
 }

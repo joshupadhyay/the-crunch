@@ -165,11 +165,21 @@ flowchart LR
   CF --> URL["Lambda Function URL\npublic + RESPONSE_STREAM"]
   URL --> LWA["Lambda Web Adapter"]
   LWA --> Bun["Bun web app"]
-  Bun --> DDB["DynamoDB\nchat state"]
+
+  Bun --> React["React UI\nlogin + trial routes"]
+  Bun --> AuthRoutes["Better Auth routes\n/api/auth/*"]
+  Bun --> ChatRoutes["Authenticated chat routes\n/api/chat/*"]
+  Bun --> TrialRoutes["Trial chat routes\n/api/trial/chat/*\n15-message cap"]
+
+  AuthRoutes --> AuthDB["Supabase Postgres\nBetter Auth tables"]
+  ChatRoutes --> DDB["DynamoDB\nuser-scoped chat state"]
+  TrialRoutes --> DDB
+
   Bun --> SM["Secrets Manager\nruntime env"]
-  Bun --> AuthDB["Postgres DATABASE_URL\nBetter Auth"]
-  Bun --> Anthropic["Anthropic API"]
-  Bun --> Langfuse["Langfuse"]
+  ChatRoutes --> Anthropic["Anthropic API"]
+  TrialRoutes --> Anthropic
+  Anthropic --> Langfuse["Langfuse\ntrial/authenticated tags"]
+  Bun --> Sentry["Sentry\nserver + browser errors"]
 ```
 
 ## Follow-Up Work

@@ -4,13 +4,20 @@ import type { Preference, Restaurant } from "./App";
 import { useNavigate, useOutletContext, useParams } from "react-router";
 import { StoryBar } from "./components/StoryBar";
 import { authClient } from "./lib/auth-client";
+import {
+  getOrCreateTrialId,
+  getTrialHeaders,
+  TRIAL_MESSAGE_LIMIT,
+} from "./trial";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-export function ChatView() {
+type ChatMode = "authenticated" | "trial";
+
+export function ChatView({ mode = "authenticated" }: { mode?: ChatMode }) {
   const { data: session } = authClient.useSession();
   const { onToggleBoard, onContextUpdate } = useOutletContext<{
     onToggleBoard: () => void;
@@ -22,6 +29,7 @@ export function ChatView() {
   // this is conversation id
   const { conversationId } = useParams();
   const navigate = useNavigate();
+  const isTrial = mode === "trial";
 
   // stores the entire conversation
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,7 +40,7 @@ export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const createNewChat = () => navigate("/chat/new");
+  const createNewChat = () => navigate(isTrial ? "/try/new" : "/chat/new");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,9 +62,17 @@ export function ChatView() {
     async function loadConversation() {
       try {
         setError(null);
-        const resp = await fetch(`/api/chat/conversations/${conversationId}`, {
-          method: "GET",
-        });
+        const resp = await fetch(
+          `${
+            isTrial ? "/api/trial/chat" : "/api/chat"
+          }/conversations/${conversationId}`,
+          {
+            method: "GET",
+            headers: isTrial
+              ? { "X-Trial-Id": getOrCreateTrialId() }
+              : undefined,
+          },
+        );
 
         if (!resp.ok) {
           throw new Error(await getResponseError(resp, "Could not load chat."));
@@ -70,7 +86,7 @@ export function ChatView() {
       }
     }
     loadConversation();
-  }, [conversationId]);
+  }, [conversationId, isTrial]);
 
   async function getResponseError(resp: Response, fallback: string) {
     try {
@@ -100,7 +116,16 @@ export function ChatView() {
       // If this is a new chat, create the conversation first
       let activeConversationId = conversationId;
       if (isNew) {
-        const createResp = await fetch("/api/chat/create", { method: "POST" });
+        const createResp = await fetch(
+          isTrial ? "/api/trial/chat/create" : "/api/chat/create",
+          isTrial
+            ? {
+                method: "POST",
+                headers: getTrialHeaders(),
+                body: JSON.stringify({ trialId: getOrCreateTrialId() }),
+              }
+            : { method: "POST" },
+        );
         if (!createResp.ok) {
           throw new Error(
             await getResponseError(
@@ -113,14 +138,20 @@ export function ChatView() {
         activeConversationId = id;
       }
 
-      const response = await fetch("/api/chat/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userText,
-          conversationId: activeConversationId,
-        }),
-      });
+      const response = await fetch(
+        isTrial ? "/api/trial/chat/send" : "/api/chat/send",
+        {
+          method: "POST",
+          headers: isTrial
+            ? getTrialHeaders()
+            : { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: userText,
+            conversationId: activeConversationId,
+            ...(isTrial ? { trialId: getOrCreateTrialId() } : {}),
+          }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -210,7 +241,12 @@ export function ChatView() {
 
       // Navigate to the real conversation URL after first message
       if (isNew && activeConversationId) {
-        navigate(`/chat/${activeConversationId}`, { replace: true });
+        navigate(
+          isTrial
+            ? `/try/${activeConversationId}`
+            : `/chat/${activeConversationId}`,
+          { replace: true },
+        );
       }
     } catch (err: any) {
       setError(err.message ?? "Something went wrong. Please try again.");
@@ -242,14 +278,24 @@ export function ChatView() {
           </div>
           <div className="flex items-center gap-3">
             <p className="text-crunch-khaki-600 text-sm font-body">
-              {session?.user?.name ?? "Guest"}
+              {isTrial ? "Trial" : session?.user?.name ?? "Guest"}
             </p>
-            <button
-              onClick={createNewChat}
-              className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
-            >
-              + New Chat
-            </button>
+            {!isTrial && (
+              <button
+                onClick={createNewChat}
+                className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors cursor-pointer"
+              >
+                + New Chat
+              </button>
+            )}
+            {isTrial && (
+              <a
+                href="/login"
+                className="px-3 py-1.5 rounded-full bg-crunch-walnut-600 text-white text-sm font-body font-semibold hover:bg-crunch-walnut-700 transition-colors"
+              >
+                Sign up
+              </a>
+            )}
             <button
               onClick={onToggleBoard}
               className="px-3 py-1.5 rounded-full bg-crunch-mahogany-700 text-white text-sm font-body font-semibold hover:bg-crunch-mahogany-800 transition-colors cursor-pointer"
@@ -267,6 +313,13 @@ export function ChatView() {
         {error && (
           <div className="max-w-2xl mx-auto mb-4 form-alert" role="alert">
             {error}
+          </div>
+        )}
+        {isTrial && (
+          <div className="max-w-2xl mx-auto mb-4 rounded-md border border-crunch-walnut-200 bg-white px-4 py-3 text-sm text-crunch-walnut-800 shadow-sm">
+            Trial chat: {messages.filter((msg) => msg.role === "user").length}/
+            {TRIAL_MESSAGE_LIMIT} messages used. Sign up to save your history
+            and keep going.
           </div>
         )}
         {messages.length === 0 ? (

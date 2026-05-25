@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
+import { propagateAttributes } from "@langfuse/tracing";
 import { executeTool, TOOLS } from "./tools";
 import { SYSTEM_PROMPT } from "./system-prompt";
 
@@ -30,6 +31,14 @@ interface StreamResult {
   toolCalls: ToolCall[];
   stopReason: string | null;
 }
+
+export type ChatTraceContext = {
+  userId: string;
+  sessionId: string;
+  traceName: string;
+  tags: string[];
+  metadata: Record<string, string>;
+};
 
 const DEFAULT_MAX_TOOL_ROUNDS = 6;
 
@@ -66,6 +75,7 @@ export class AnthropicChatBot {
     message: Message,
     conversationId: string,
     userId: string,
+    traceContext?: ChatTraceContext,
   ) {
     // User message comes in, push it to the DB immediately
     await this.DATABASE.pushMessage(
@@ -89,13 +99,7 @@ export class AnthropicChatBot {
         userId,
       );
 
-      const stream = await this.client.messages.create({
-        system: SYSTEM_PROMPT,
-        messages: toMessageParams(messages),
-        stream: true,
-        tools: TOOLS,
-        ...this.anthropicApiParams,
-      });
+      const stream = await this.createMessageStream(messages, traceContext);
 
       // yield* delegates frontend events AND captures the return value
       const result = yield* this.consumeStream(stream);
@@ -191,6 +195,33 @@ export class AnthropicChatBot {
     }
 
     return { textContent, toolCalls, stopReason };
+  }
+
+  private createMessageStream(
+    messages: Message[],
+    traceContext?: ChatTraceContext,
+  ) {
+    const createStream = () =>
+      this.client.messages.create({
+        system: SYSTEM_PROMPT,
+        messages: toMessageParams(messages),
+        stream: true,
+        tools: TOOLS,
+        ...this.anthropicApiParams,
+      });
+
+    if (!traceContext) return createStream();
+
+    return propagateAttributes(
+      {
+        userId: traceContext.userId,
+        sessionId: traceContext.sessionId,
+        traceName: traceContext.traceName,
+        tags: traceContext.tags,
+        metadata: traceContext.metadata,
+      },
+      createStream,
+    );
   }
 
   /**
