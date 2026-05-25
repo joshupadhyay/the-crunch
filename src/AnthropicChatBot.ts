@@ -41,6 +41,76 @@ export type ChatTraceContext = {
 };
 
 const DEFAULT_MAX_TOOL_ROUNDS = 6;
+const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-pro";
+
+function resolveModelProvider() {
+  const provider =
+    process.env.LLM_PROVIDER ??
+    (process.env.OPENROUTER_API_KEY
+      ? "openrouter"
+      : process.env.DEEPSEEK_API_KEY
+        ? "deepseek"
+        : "anthropic");
+
+  if (provider === "openrouter") {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("LLM_PROVIDER=openrouter requires OPENROUTER_API_KEY.");
+    }
+
+    return {
+      model: process.env.LLM_MODEL ?? DEFAULT_OPENROUTER_MODEL,
+      clientOptions: {
+        apiKey: null,
+        authToken: apiKey,
+        baseURL:
+          process.env.LLM_BASE_URL ?? process.env.OPENROUTER_BASE_URL ??
+          "https://openrouter.ai/api",
+        defaultHeaders: {
+          "HTTP-Referer":
+            process.env.OPENROUTER_HTTP_REFERER ??
+            process.env.BETTER_AUTH_URL ??
+            "https://d2w56c6hcnyw72.cloudfront.net",
+          "X-OpenRouter-Title":
+            process.env.OPENROUTER_APP_TITLE ?? "The Crunch",
+        },
+      } satisfies ConstructorParameters<typeof Anthropic>[0],
+    };
+  }
+
+  if (provider === "deepseek") {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error("LLM_PROVIDER=deepseek requires DEEPSEEK_API_KEY.");
+    }
+
+    return {
+      model: process.env.LLM_MODEL ?? DEFAULT_DEEPSEEK_MODEL,
+      clientOptions: {
+        apiKey,
+        baseURL:
+          process.env.LLM_BASE_URL ?? process.env.DEEPSEEK_BASE_URL ??
+          "https://api.deepseek.com/anthropic",
+      } satisfies ConstructorParameters<typeof Anthropic>[0],
+    };
+  }
+
+  if (provider !== "anthropic") {
+    throw new Error(
+      `Unsupported LLM_PROVIDER "${provider}". Use openrouter, deepseek, or anthropic.`,
+    );
+  }
+
+  return {
+    model: process.env.LLM_MODEL ?? DEFAULT_ANTHROPIC_MODEL,
+    clientOptions: {
+      apiKey: process.env.ANTHROPIC_API_KEY ?? "NO KEY DEFINED",
+      baseURL: process.env.LLM_BASE_URL ?? process.env.ANTHROPIC_BASE_URL,
+    } satisfies ConstructorParameters<typeof Anthropic>[0],
+  };
+}
 
 export class AnthropicChatBot {
   DATABASE: IDatabase;
@@ -48,15 +118,14 @@ export class AnthropicChatBot {
 
   anthropicApiParams: Pick<MessageCreateParams, "max_tokens" | "model"> = {
     max_tokens: 4096,
-    // SAVE MONEY – DO NOT CHANGE THE MODEL TYPE
-    model: "claude-haiku-4-5-20251001",
+    model: DEFAULT_ANTHROPIC_MODEL,
   };
 
   constructor(database: IDatabase) {
     this.DATABASE = database;
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY ?? "NO KEY DEFINED",
-    });
+    const provider = resolveModelProvider();
+    this.anthropicApiParams.model = provider.model;
+    this.client = new Anthropic(provider.clientOptions);
   }
 
   async createConversation(userId: string) {

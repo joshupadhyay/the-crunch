@@ -56,6 +56,11 @@ jobs:
 
       - name: Upsert runtime secrets
         env:
+          LLM_PROVIDER: openrouter
+          LLM_MODEL: deepseek/deepseek-v4-pro
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_HTTP_REFERER: ${{ secrets.BETTER_AUTH_URL }}
+          OPENROUTER_APP_TITLE: The Crunch
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
@@ -96,6 +101,11 @@ jobs:
 
           SECRET_JSON="$(jq -n \
             --argjson existing "$EXISTING_SECRET" \
+            --arg llmProvider "$LLM_PROVIDER" \
+            --arg llmModel "$LLM_MODEL" \
+            --arg openrouter "$OPENROUTER_API_KEY" \
+            --arg openrouterReferer "$OPENROUTER_HTTP_REFERER" \
+            --arg openrouterTitle "$OPENROUTER_APP_TITLE" \
             --arg anthropic "$ANTHROPIC_API_KEY" \
             --arg database "$DATABASE_URL" \
             --arg mapbox "$MAPBOX_ACCESS_TOKEN" \
@@ -117,6 +127,11 @@ jobs:
             --arg publicSentryReplaysSessionSampleRate "$PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE" \
             --arg publicSentryReplaysOnErrorSampleRate "$PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE" \
             '$existing * ({
+              LLM_PROVIDER: $llmProvider,
+              LLM_MODEL: $llmModel,
+              OPENROUTER_API_KEY: $openrouter,
+              OPENROUTER_HTTP_REFERER: $openrouterReferer,
+              OPENROUTER_APP_TITLE: $openrouterTitle,
               ANTHROPIC_API_KEY: $anthropic,
               DATABASE_URL: $database,
               MAPBOX_ACCESS_TOKEN: $mapbox,
