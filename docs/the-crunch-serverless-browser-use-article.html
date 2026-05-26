@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Crunch: From Always-On EC2 to Serverless Restaurant Agents</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #2d211b;
+        --muted: #715f54;
+        --paper: #fffaf4;
+        --panel: #ffffff;
+        --line: #ead9c8;
+        --rust: #b55229;
+        --green: #1f6f5b;
+        --gold: #b7832f;
+        --charcoal: #1b2624;
+        --soft-green: #e8f1eb;
+        --soft-rust: #f8e8df;
+        --soft-gold: #fbf0d8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(180deg, rgba(31, 111, 91, 0.09), transparent 360px),
+          var(--paper);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.65;
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 40px 22px 72px;
+      }
+
+      article {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: 0 24px 80px rgba(45, 33, 27, 0.08);
+      }
+
+      header {
+        padding: 64px clamp(24px, 7vw, 92px) 48px;
+        border-bottom: 1px solid var(--line);
+        background:
+          radial-gradient(circle at 18% 0%, rgba(181, 82, 41, 0.14), transparent 32%),
+          linear-gradient(135deg, #fffaf4, #f4f0e7);
+      }
+
+      .eyebrow {
+        margin: 0 0 18px;
+        color: var(--rust);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 840px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2.4rem, 6vw, 5.1rem);
+        font-weight: 800;
+      }
+
+      .dek {
+        max-width: 760px;
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.08rem, 2vw, 1.3rem);
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 30px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--muted);
+        font-size: 0.88rem;
+        font-weight: 650;
+      }
+
+      .content {
+        padding: 46px clamp(22px, 7vw, 92px) 72px;
+      }
+
+      section + section {
+        margin-top: 54px;
+      }
+
+      h2 {
+        margin-bottom: 18px;
+        color: var(--charcoal);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.75rem, 3.4vw, 3rem);
+      }
+
+      h3 {
+        margin: 26px 0 10px;
+        color: var(--charcoal);
+        font-size: 1.1rem;
+      }
+
+      p {
+        margin: 0 0 18px;
+      }
+
+      a {
+        color: var(--rust);
+      }
+
+      .lead {
+        color: var(--charcoal);
+        font-size: 1.18rem;
+      }
+
+      .callout {
+        margin: 28px 0;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-left: 6px solid var(--rust);
+        background: var(--soft-rust);
+      }
+
+      .callout strong,
+      .note strong {
+        color: var(--charcoal);
+      }
+
+      .note {
+        margin: 24px 0;
+        padding: 20px;
+        border: 1px solid #d5e5db;
+        background: var(--soft-green);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin: 28px 0;
+      }
+
+      .card {
+        min-height: 160px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        background: #fffdf9;
+      }
+
+      .card h3 {
+        margin-top: 0;
+      }
+
+      .card p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 14px;
+        margin: 26px 0;
+      }
+
+      .event {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 20px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: #fffdf9;
+      }
+
+      .event time {
+        color: var(--rust);
+        font-weight: 800;
+      }
+
+      .event p {
+        margin-bottom: 0;
+      }
+
+      .diagram {
+        margin: 28px 0;
+        padding: 24px;
+        border: 1px solid var(--line);
+        background: #f8f5ef;
+        overflow-x: auto;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(140px, 1fr));
+        gap: 10px;
+        min-width: 760px;
+        align-items: stretch;
+      }
+
+      .node {
+        position: relative;
+        display: flex;
+        min-height: 88px;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        text-align: center;
+        font-weight: 750;
+      }
+
+      .node::after {
+        position: absolute;
+        right: -10px;
+        color: var(--gold);
+        content: ">";
+        font-weight: 900;
+      }
+
+      .node:last-child::after {
+        content: "";
+      }
+
+      .node.alt {
+        background: var(--soft-green);
+      }
+
+      ul,
+      ol {
+        margin: 10px 0 22px;
+        padding-left: 22px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        padding: 2px 5px;
+        border: 1px solid var(--line);
+        background: #fff8ec;
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 24px 0;
+        padding: 18px;
+        border: 1px solid #263d38;
+        background: #152421;
+        color: #f7f1e9;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+      }
+
+      table {
+        width: 100%;
+        margin: 24px 0;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        padding: 13px 14px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--soft-gold);
+        color: var(--charcoal);
+      }
+
+      blockquote {
+        margin: 28px 0;
+        padding: 6px 0 6px 24px;
+        border-left: 5px solid var(--green);
+        color: var(--charcoal);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.28rem;
+        line-height: 1.45;
+      }
+
+      .footer-note {
+        margin-top: 54px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 780px) {
+        main {
+          padding: 18px 12px 42px;
+        }
+
+        header,
+        .content {
+          padding-left: 22px;
+          padding-right: 22px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .event {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <header>
+          <p class="eyebrow">Draft Blog Post</p>
+          <h1>The Crunch: From Always-On EC2 to Serverless Restaurant Agents</h1>
+          <p class="dek">
+            A practical migration story about turning a small restaurant concierge into a serverless AWS app, then extending it toward real reservation availability with Browser Use Cloud.
+          </p>
+          <div class="meta" aria-label="Article metadata">
+            <span class="pill">The Crunch</span>
+            <span class="pill">AWS Lambda</span>
+            <span class="pill">DynamoDB</span>
+            <span class="pill">OpenRouter + DeepSeek</span>
+            <span class="pill">Browser Use Cloud</span>
+          </div>
+        </header>
+
+        <div class="content">
+          <section>
+            <p class="lead">
+              The Crunch started as a charming restaurant planning app with a familiar early-stage deployment story: one always-on EC2 box, a Docker container, and a lot of implied operational responsibility hiding behind the phrase "it works."
+            </p>
+            <p>
+              That was fine for proving the idea. It was less fine for maintaining it. A restaurant concierge is bursty by nature. People open it when they are planning a night out, not because it needs a server burning money all afternoon. So the core question became simple: could we keep the product shape, preserve streaming chat, add real observability, and get rid of the always-on machine?
+            </p>
+            <p>
+              The answer was yes, but the path was not just "put it on Lambda." The useful part of the work was finding which parts belonged in the web runtime, which parts belonged in managed data stores, and which parts were better left as future worker jobs.
+            </p>
+          </section>
+
+          <section>
+            <h2>The Starting Point</h2>
+            <p>
+              The original architecture was direct: GitHub Actions SSHed into EC2, ran a Docker container, and the app served everything from a Bun server. That kept the stack understandable, but it left the app with the classic small-project tax:
+            </p>
+            <div class="grid">
+              <div class="card">
+                <h3>Always-On Cost</h3>
+                <p>An EC2 instance runs whether anyone is using the app or not.</p>
+              </div>
+              <div class="card">
+                <h3>Manual Runtime Ownership</h3>
+                <p>The app owner inherits patching, host health, process supervision, and deployment drift.</p>
+              </div>
+              <div class="card">
+                <h3>Awkward Scaling</h3>
+                <p>Traffic spikes and quiet periods are both handled by the same single box.</p>
+              </div>
+            </div>
+            <p>
+              The product itself was more interesting than the infrastructure. The Crunch is a restaurant and bar concierge with a retro food-critic voice. It streams chat responses, uses tools for current restaurant research and geocoding, stores conversations, and supports both authenticated and trial flows. The challenge was to move the hosting model without flattening that experience.
+            </p>
+          </section>
+
+          <section>
+            <h2>Choosing The Serverless Shape</h2>
+            <p>
+              The first instinct was to stay AWS-native if possible. Cloudflare was attractive, especially for cost and simplicity, but moving to Cloudflare Workers would have meant adapting runtime assumptions, persistence choices, and server-side dependencies at the same time.
+            </p>
+            <p>
+              The AWS path that fit best was Lambda Web Adapter plus a container image. Bun could keep serving HTTP. GitHub Actions could keep building Docker. Lambda would handle scale-to-zero behavior. CloudFront would provide the stable public endpoint.
+            </p>
+
+            <div class="diagram" aria-label="Serverless deployment flow">
+              <div class="flow">
+                <div class="node">User Browser</div>
+                <div class="node">CloudFront</div>
+                <div class="node">Lambda Function URL</div>
+                <div class="node">Lambda Web Adapter</div>
+                <div class="node alt">Bun App</div>
+              </div>
+            </div>
+
+            <p>
+              For chat persistence, DynamoDB became the right first serverless store. It fits the conversation access patterns, requires no VPC attachment, and keeps Lambda response streaming viable. Better Auth remained Postgres-backed through Supabase for now, which avoided mixing a compute migration with a full auth rewrite.
+            </p>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Part</th>
+                  <th>Decision</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Compute</td>
+                  <td>Lambda container with Lambda Web Adapter</td>
+                  <td>Preserved the Bun HTTP server while removing the always-on EC2 host.</td>
+                </tr>
+                <tr>
+                  <td>Public Edge</td>
+                  <td>CloudFront in front of Lambda Function URL</td>
+                  <td>Gave the app a stable browser-facing endpoint and avoided direct Lambda URL cookie/origin confusion.</td>
+                </tr>
+                <tr>
+                  <td>Chat Store</td>
+                  <td>DynamoDB</td>
+                  <td>Serverless, simple access pattern, no VPC requirement for streaming Lambda.</td>
+                </tr>
+                <tr>
+                  <td>Auth Store</td>
+                  <td>Supabase Postgres for Better Auth</td>
+                  <td>Kept auth working while deferring the bigger auth-platform decision.</td>
+                </tr>
+                <tr>
+                  <td>Secrets</td>
+                  <td>AWS Secrets Manager</td>
+                  <td>Kept runtime secrets out of tracked files and local bundles.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="callout">
+              <strong>The key constraint:</strong> Lambda Function URLs support response streaming, but putting Lambda into a VPC to reach a private database would complicate that path. That made DynamoDB a better chat-store fit than Aurora Serverless for the first migration.
+            </div>
+          </section>
+
+          <section>
+            <h2>The Migration Work</h2>
+            <p>
+              Once the shape was clear, the work broke into a few practical tracks.
+            </p>
+
+            <div class="timeline">
+              <div class="event">
+                <time>Track 1</time>
+                <p><strong>Infrastructure.</strong> Add a CDK stack for ECR, Lambda, DynamoDB, Function URL, CloudFront, and permissions.</p>
+              </div>
+              <div class="event">
+                <time>Track 2</time>
+                <p><strong>Deployment.</strong> Update GitHub Actions to build, push, upsert runtime secrets, deploy CDK, invalidate CloudFront, and smoke test the app.</p>
+              </div>
+              <div class="event">
+                <time>Track 3</time>
+                <p><strong>Persistence.</strong> Move chat state behind a user-scoped database interface and use DynamoDB in production.</p>
+              </div>
+              <div class="event">
+                <time>Track 4</time>
+                <p><strong>Observability.</strong> Add Langfuse for LLM traces, Sentry scaffolding, and research eval reports.</p>
+              </div>
+              <div class="event">
+                <time>Track 5</time>
+                <p><strong>Product Surface.</strong> Add a trial chat flow with a 15-message cap so users can try the product before signing up.</p>
+              </div>
+            </div>
+
+            <p>
+              A few bugs were especially clarifying. The app initially had origin issues because the browser was mixing local and deployed endpoints. The fix was to treat CloudFront as the canonical production URL and avoid using the raw Lambda Function URL for user flows.
+            </p>
+            <p>
+              Another bug was more embarrassing, and more useful: after switching the chat model to OpenRouter and DeepSeek, production briefly returned a Lambda runtime error blob as <code>application/octet-stream</code>. Chrome downloaded it like a file. The root cause was straightforward: local had <code>OPENROUTER_API_KEY</code>, GitHub Secrets did not. The deploy workflow had hardcoded the provider to OpenRouter, so Lambda crashed during startup.
+            </p>
+
+            <div class="note">
+              <strong>The fix was not just adding the secret.</strong> The deploy smoke test now checks that the homepage returns <code>Content-Type: text/html</code>. That turns a subtle browser symptom into a direct CI failure.
+            </div>
+          </section>
+
+          <section>
+            <h2>Switching The Model Path</h2>
+            <p>
+              The Crunch originally used the Anthropic SDK directly. That worked, but model cost matters quickly once users start chatting and tools enter the loop. The app now supports a configurable provider path while preserving the existing Anthropic message and tool-use structure.
+            </p>
+            <pre><code>LLM_PROVIDER=openrouter
+LLM_MODEL=deepseek/deepseek-v4-pro
+OPENROUTER_API_KEY=...</code></pre>
+            <p>
+              OpenRouter became the default route for DeepSeek V4 Pro, with direct DeepSeek and Anthropic fallback paths still available. This let the app keep its streaming loop, tool calls, and Langfuse/Sentry instrumentation without a full rewrite.
+            </p>
+            <p>
+              The lesson here was small but important: provider switches are easy locally and dangerous in CI if the secret story is not part of the change. A model migration is also a deployment migration.
+            </p>
+          </section>
+
+          <section>
+            <h2>The Browser Use Extension</h2>
+            <p>
+              Once the core app was serverless, the next product question became more ambitious: could The Crunch stop merely suggesting restaurants and actually check real reservation availability?
+            </p>
+            <p>
+              Restaurant booking is not just another API call. Resy and OpenTable are dynamic websites with bot defenses, date pickers, time selectors, account flows, and plenty of edge cases. Browser Use looked like a promising fit because it gives an AI agent a browser and a task, then lets it inspect and act on real pages.
+            </p>
+
+            <blockquote>
+              The right first product goal is not "book it for me." It is "show me real availability and hand me the booking link."
+            </blockquote>
+
+            <h3>Local Browser Use</h3>
+            <p>
+              The first probe used the open-source Python package locally with OpenRouter and DeepSeek. It worked on a smoke test and could drive basic browser actions. But on booking sites, the limits showed up quickly:
+            </p>
+            <ul>
+              <li>OpenTable allowed homepage interaction, then search requests returned <code>403 Access Denied</code>.</li>
+              <li>Browser Use flagged the OpenTable flow as likely blocked by bot or captcha defenses.</li>
+              <li>Resy was more navigable, but the agent produced a likely false negative when search/autocomplete behavior was not handled carefully.</li>
+            </ul>
+
+            <h3>Browser Use Cloud</h3>
+            <p>
+              The docs made the missing piece clear: Browser Use's "undetectable" browser is the Cloud product, not the plain local Chromium path. Cloud v3 provides managed stealth browsers, residential proxies, captcha handling, recordings, live preview, and structured output.
+            </p>
+            <p>
+              With Browser Use Cloud, the same OpenTable experiment improved immediately. The agent got past the earlier 403, found the L'Artusi OpenTable page, and discovered that OpenTable does not book L'Artusi directly. Then the Resy probe found the actual reservation page and returned visible availability.
+            </p>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Probe</th>
+                  <th>Result</th>
+                  <th>What It Means</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Local OpenTable</td>
+                  <td>Blocked by <code>403 Access Denied</code></td>
+                  <td>Normal local browser automation is not enough for this class of site.</td>
+                </tr>
+                <tr>
+                  <td>Cloud OpenTable</td>
+                  <td>Reached L'Artusi page, found "not available on OpenTable"</td>
+                  <td>Stealth browser path produced useful evidence instead of a network blocker.</td>
+                </tr>
+                <tr>
+                  <td>Cloud Resy</td>
+                  <td>Found L'Artusi availability for June 5, 2026, party of 2</td>
+                  <td>No 8 PM slot, but visible alternatives included lunch and late-night slots.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <pre><code>bun run reservation:probe:cloud -- \
+  --platform Resy \
+  --restaurant "L'Artusi" \
+  --location "New York, NY" \
+  --date 2026-06-05 \
+  --time "8:00 PM" \
+  --party-size 2</code></pre>
+          </section>
+
+          <section>
+            <h2>The Architecture That Wants To Exist</h2>
+            <p>
+              The Browser Use experiment should not be shoved into the Lambda web server. Browser automation is slower, more failure-prone, and more resource-intensive than a normal chat request. It wants to be a worker.
+            </p>
+
+            <div class="diagram" aria-label="Reservation worker flow">
+              <div class="flow">
+                <div class="node">Chat App</div>
+                <div class="node">SQS Job</div>
+                <div class="node">Reservation Worker</div>
+                <div class="node">Browser Use Cloud</div>
+                <div class="node alt">Availability Result</div>
+              </div>
+            </div>
+
+            <p>
+              The production version should probably look like this:
+            </p>
+            <ol>
+              <li>The user asks for a real reservation check.</li>
+              <li>The app gathers restaurant, date, time, party size, and platform.</li>
+              <li>The app queues a job with strict domain and action guardrails.</li>
+              <li>A worker calls Browser Use Cloud and stores the result, recording link, and booking URL.</li>
+              <li>The chat returns availability evidence and asks the user to complete the booking manually.</li>
+            </ol>
+            <p>
+              That design keeps the main chat experience responsive and keeps booking actions human-confirmed. It also gives us auditability: which site was checked, what slots were visible, what the browser saw, and where the user should go next.
+            </p>
+          </section>
+
+          <section>
+            <h2>What Changed In The Repo</h2>
+            <p>
+              The work landed across a few branches and commits. The useful end state is less about individual commits and more about the new capabilities.
+            </p>
+            <ul>
+              <li>Serverless deploy path: GitHub Actions, ECR, CDK, Lambda Web Adapter, Function URL, CloudFront.</li>
+              <li>Production chat persistence: DynamoDB with user-scoped conversations.</li>
+              <li>Auth persistence: Better Auth tables in Supabase Postgres.</li>
+              <li>Trial flow: <code>/try/new</code> and trial chat APIs with a 15-message cap.</li>
+              <li>LLM provider path: OpenRouter plus DeepSeek V4 Pro, with fallbacks.</li>
+              <li>Monitoring: Langfuse tracing, Sentry scaffolding, and research eval reports.</li>
+              <li>Browser Use spike: local and Cloud reservation probe scripts plus findings documentation.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Lessons</h2>
+            <div class="grid">
+              <div class="card">
+                <h3>Serverless Is A Product Decision</h3>
+                <p>It is not just cheaper hosting. It changes what you monitor, test, and isolate.</p>
+              </div>
+              <div class="card">
+                <h3>Secrets Are Part Of The Feature</h3>
+                <p>A local provider switch is incomplete until CI and runtime secrets are proven.</p>
+              </div>
+              <div class="card">
+                <h3>Agents Need Boundaries</h3>
+                <p>Reservation agents should check and explain, not silently book.</p>
+              </div>
+            </div>
+            <p>
+              The Crunch is now much closer to the kind of app it wants to be: small, maintainable, serverless by default, and capable of using specialized workers for the messy parts of the web.
+            </p>
+            <p>
+              The most interesting part is that the future feature is not a generic "browser agent." It is a restaurant-specific availability agent with a narrow job, strict guardrails, evidence capture, and a graceful handoff to the user. That is where browser automation starts to feel like product infrastructure rather than a stunt.
+            </p>
+          </section>
+
+          <section>
+            <h2>Next Draft Notes</h2>
+            <p>
+              Before publishing, this article could be tightened in a few ways:
+            </p>
+            <ul>
+              <li>Add screenshots of the live CloudFront app and Browser Use Cloud session recordings.</li>
+              <li>Replace internal endpoint names with public-friendly names if the post is for a broad audience.</li>
+              <li>Decide how much implementation detail to reveal about auth, secrets, and deployment.</li>
+              <li>Add a small cost comparison once real Lambda, DynamoDB, OpenRouter, and Browser Use Cloud usage settles.</li>
+            </ul>
+          </section>
+
+          <p class="footer-note">
+            Draft generated from The Crunch migration and Browser Use experimentation thread. Last updated May 25, 2026.
+          </p>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>
