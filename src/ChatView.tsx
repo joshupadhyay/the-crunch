@@ -8,6 +8,11 @@ import { authClient } from "./lib/auth-client";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  traceId?: string;
+  feedback?: {
+    score: 0 | 1;
+    comment?: string;
+  };
 }
 
 export function ChatView() {
@@ -28,6 +33,12 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUsingTool, setIsUsingTool] = useState<string | undefined>();
+  const [feedbackDraft, setFeedbackDraft] = useState<{
+    messageIndex: number;
+    comment: string;
+  } | null>(null);
+  const [feedbackPending, setFeedbackPending] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -61,6 +72,49 @@ export function ChatView() {
     }
     loadConversation();
   }, [conversationId]);
+
+  async function submitFeedback(
+    messageIndex: number,
+    score: 0 | 1,
+    comment?: string,
+  ) {
+    const message = messages[messageIndex];
+    if (!message?.traceId) return;
+
+    setFeedbackPending(messageIndex);
+    setError(null);
+
+    try {
+      const resp = await fetch("/api/chat/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          traceId: message.traceId,
+          score,
+          comment: comment?.trim() || undefined,
+          conversationId: conversationId === "new" ? undefined : conversationId,
+        }),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not save feedback.");
+      }
+
+      setMessages((prev) =>
+        prev.map((msg, index) =>
+          index === messageIndex
+            ? { ...msg, feedback: { score, comment: comment?.trim() || undefined } }
+            : msg,
+        ),
+      );
+      setFeedbackDraft(null);
+    } catch (err: any) {
+      setError(err.message ?? "Could not save feedback.");
+    } finally {
+      setFeedbackPending(null);
+    }
+  }
 
   const sendMessage = async () => {
     // append latest input to messages.. modifying like this to avoid adjusting messages inplace
@@ -100,6 +154,7 @@ export function ChatView() {
     const decoder = new TextDecoder();
 
     let assistantText = "";
+    let assistantTraceId: string | undefined;
 
     // set empty chatbot message. We'll be updating this with each chunk as they come in
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -121,7 +176,9 @@ export function ChatView() {
       for (const line of lines) {
         const parsed = JSON.parse(line);
 
-        if (parsed.type === "text") {
+        if (parsed.type === "trace_meta" && parsed.traceId) {
+          assistantTraceId = parsed.traceId;
+        } else if (parsed.type === "text") {
           assistantText += parsed.text.text;
         } else if (parsed.type === "tool_use_start") {
           // show tool use as it happens...
@@ -148,7 +205,11 @@ export function ChatView() {
       // replace the last message with updated text — new array, new object
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: "assistant", content: assistantText },
+        {
+          role: "assistant",
+          content: assistantText,
+          traceId: assistantTraceId,
+        },
       ]);
     }
 
@@ -170,7 +231,11 @@ export function ChatView() {
         .trim();
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: "assistant", content: assistantText },
+        {
+          role: "assistant",
+          content: assistantText,
+          traceId: assistantTraceId,
+        },
       ]);
     }
 
@@ -226,6 +291,11 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 bg-crunch-cream">
+        {error && (
+          <div className="max-w-2xl mx-auto mb-4 form-alert" role="alert">
+            {error}
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">
@@ -261,6 +331,11 @@ export function ChatView() {
           <div className="max-w-2xl mx-auto flex flex-col gap-3">
             {messages.map((msg, i) => {
               const isUser = msg.role === "user";
+              const showFeedback =
+                !isUser &&
+                !isLoading &&
+                Boolean(msg.traceId) &&
+                msg.content.trim().length > 0;
               return (
                 <div
                   key={i}
@@ -276,9 +351,97 @@ export function ChatView() {
                     {isUser ? (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     ) : (
-                      <div className="prose prose-sm prose-stone max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
+                      <>
+                        <div className="prose prose-sm prose-stone max-w-none">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                        {showFeedback && (
+                          <div className="mt-3 pt-3 border-t border-crunch-walnut-100">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-crunch-khaki-600">
+                                Helpful?
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="Thumbs up"
+                                disabled={feedbackPending === i}
+                                onClick={() => submitFeedback(i, 1)}
+                                className={`rounded-full px-2 py-1 text-sm transition-colors cursor-pointer disabled:opacity-50 ${
+                                  msg.feedback?.score === 1
+                                    ? "bg-crunch-walnut-100 text-crunch-walnut-800"
+                                    : "text-crunch-khaki-600 hover:bg-crunch-walnut-50"
+                                }`}
+                              >
+                                👍
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Thumbs down"
+                                disabled={feedbackPending === i}
+                                onClick={() =>
+                                  setFeedbackDraft({ messageIndex: i, comment: "" })
+                                }
+                                className={`rounded-full px-2 py-1 text-sm transition-colors cursor-pointer disabled:opacity-50 ${
+                                  msg.feedback?.score === 0
+                                    ? "bg-crunch-walnut-100 text-crunch-walnut-800"
+                                    : "text-crunch-khaki-600 hover:bg-crunch-walnut-50"
+                                }`}
+                              >
+                                👎
+                              </button>
+                              {msg.feedback && (
+                                <span className="text-xs text-crunch-khaki-500">
+                                  Saved to Langfuse
+                                </span>
+                              )}
+                            </div>
+                            {feedbackDraft?.messageIndex === i && (
+                              <div className="mt-2 flex flex-col gap-2">
+                                <textarea
+                                  value={feedbackDraft.comment}
+                                  onChange={(e) =>
+                                    setFeedbackDraft({
+                                      messageIndex: i,
+                                      comment: e.target.value,
+                                    })
+                                  }
+                                  placeholder="What could be better? (optional)"
+                                  rows={2}
+                                  className="w-full resize-none rounded-lg border border-crunch-walnut-200 px-3 py-2 text-sm text-crunch-walnut-900 placeholder:text-crunch-khaki-400 focus:outline-none focus:border-crunch-walnut-500"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={feedbackPending === i}
+                                    onClick={() =>
+                                      submitFeedback(
+                                        i,
+                                        0,
+                                        feedbackDraft.comment,
+                                      )
+                                    }
+                                    className="rounded-full bg-crunch-walnut-600 px-3 py-1 text-xs font-semibold text-white hover:bg-crunch-walnut-700 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    Send feedback
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFeedbackDraft(null)}
+                                    className="rounded-full px-3 py-1 text-xs text-crunch-khaki-600 hover:bg-crunch-walnut-50 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {msg.feedback?.comment && (
+                              <p className="mt-2 text-xs text-crunch-khaki-600">
+                                “{msg.feedback.comment}”
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import type { IDatabase, Message } from "./databases/Database";
 import type { MessageCreateParams } from "@anthropic-ai/sdk/resources";
+import { trace } from "@opentelemetry/api";
 import { executeTool, TOOLS } from "./tools";
 import { SYSTEM_PROMPT } from "./system-prompt";
 
@@ -84,7 +85,7 @@ export class AnthropicChatBot {
       });
 
       // yield* delegates frontend events AND captures the return value
-      const result = yield* this.consumeStream(stream);
+      const result = yield* this.consumeStream(stream, true);
       stopReason = result.stopReason;
 
       // If the stream pauses for tool use, we handle it. We have many tools with formats!
@@ -109,6 +110,7 @@ export class AnthropicChatBot {
    */
   private async *consumeStream(
     stream: AsyncIterable<Anthropic.RawMessageStreamEvent>,
+    emitTraceMeta = false,
   ): AsyncGenerator<unknown, StreamResult> {
     const toolCalls: ToolCall[] = [];
     let currentToolName = "";
@@ -116,8 +118,16 @@ export class AnthropicChatBot {
     let currentToolInput = "";
     let textContent = "";
     let stopReason: string | null = null;
+    let traceMetaSent = false;
 
     for await (const event of stream) {
+      if (emitTraceMeta && !traceMetaSent) {
+        const traceId = trace.getActiveSpan()?.spanContext().traceId;
+        if (traceId) {
+          yield { type: "trace_meta", traceId };
+          traceMetaSent = true;
+        }
+      }
       if (event.type === "content_block_start") {
         if (event.content_block.type === "tool_use") {
           currentToolName = event.content_block.name;

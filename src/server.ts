@@ -4,6 +4,7 @@ import { AnthropicChatBot } from "./AnthropicChatBot";
 import { createDatabase } from "./databases/createDatabase";
 import type { Message } from "./databases/Database";
 import { auth } from "./auth-client";
+import { isLangfuseFeedbackEnabled, postUserFeedback } from "./langfuse-feedback";
 
 /**
  * Init Chatbot with the configured persistent store.
@@ -25,6 +26,67 @@ export const server = serve({
           return Response.json({ error: "MAPBOX_ACCESS_TOKEN not set" }, { status: 500 });
         }
         return Response.json({ token });
+      },
+    },
+
+    "/api/chat/feedback": {
+      async POST(req) {
+        let userId: string;
+        try {
+          userId = await authCheck(req);
+        } catch {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        if (!isLangfuseFeedbackEnabled()) {
+          return Response.json(
+            { error: "Feedback is not configured" },
+            { status: 503 },
+          );
+        }
+
+        const body = await req.json().catch(() => null);
+        if (!body || typeof body !== "object") {
+          return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+        }
+
+        const { traceId, score, comment, conversationId } = body as {
+          traceId?: unknown;
+          score?: unknown;
+          comment?: unknown;
+          conversationId?: unknown;
+        };
+
+        if (typeof traceId !== "string" || (score !== 0 && score !== 1)) {
+          return Response.json(
+            { error: "traceId and score (0 or 1) are required" },
+            { status: 400 },
+          );
+        }
+
+        const result = await postUserFeedback({
+          traceId,
+          score,
+          comment: typeof comment === "string" ? comment : undefined,
+          conversationId:
+            typeof conversationId === "string" ? conversationId : undefined,
+          userId,
+        });
+
+        if (!result.ok) {
+          const status =
+            result.reason === "invalid"
+              ? 400
+              : result.reason === "disabled"
+                ? 503
+                : 502;
+          return Response.json(
+            { error: result.detail ?? "Could not save feedback" },
+            { status },
+          );
+        }
+
+        return Response.json({ ok: true, scoreId: result.scoreId });
       },
     },
 
@@ -180,7 +242,9 @@ function toDisplayMessages(messages: Message[]): Message[] {
 async function authCheck(req: Request) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session) {
+  if (!session?.user?.id) {
     throw new Error("401 unauthorized");
   }
+
+  return session.user.id;
 }
