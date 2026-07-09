@@ -151,6 +151,11 @@ export function ChatView() {
     });
 
     const reader = response.body?.getReader();
+    if (!reader) {
+      setIsLoading(false);
+      setError("The chat stream could not be opened.");
+      return;
+    }
     const decoder = new TextDecoder();
 
     let assistantText = "";
@@ -161,7 +166,7 @@ export function ChatView() {
 
     while (true) {
       // read chunk by chunk as it comes in
-      const { done, value } = await reader?.read();
+      const { done, value } = await reader.read();
 
       // while (true) because we don't know how many chunks. but we know we will get done message
       if (done) break;
