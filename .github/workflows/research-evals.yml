@@ -3,10 +3,14 @@ name: Research evals
 on:
   workflow_dispatch:
     inputs:
-      model:
-        description: Model to evaluate
+      models:
+        description: Comma-separated OpenRouter model IDs to compare
         required: false
         default: deepseek/deepseek-v4-pro
+      provider:
+        description: Evaluation provider (openrouter or anthropic)
+        required: false
+        default: openrouter
 
 permissions:
   contents: read
@@ -24,9 +28,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate eval infrastructure
+        run: |
+          bun run typecheck
+          bun run eval:contracts
+
       - name: Run research evals
         env:
-          EVAL_MODEL: ${{ inputs.model }}
+          EVAL_MODELS: ${{ inputs.models }}
+          EVAL_PROVIDER: ${{ inputs.provider }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_HTTP_REFERER: ${{ secrets.BETTER_AUTH_URL }}
           OPENROUTER_APP_TITLE: The Crunch
@@ -43,7 +53,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: research-eval-report
-          path: |
-            evals/reports/research-eval-report.html
-            evals/reports/research-eval-results.json
+          path: evals/reports/runs/
           if-no-files-found: error
+          retention-days: 14
