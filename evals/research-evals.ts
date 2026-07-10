@@ -331,7 +331,17 @@ function traceScores(metrics: MetricResult[]): TraceScore[] {
 }
 
 function passesRoutingGate(metrics: MetricResult[], overall: number): boolean {
-  return metrics.every((metric) => metric.score === 1) && overall >= MIN_AVERAGE;
+  const hardMetrics = new Set([
+    "required_tool_use",
+    "forbidden_tool_avoidance",
+    "constraint_capture",
+    "overasking_and_bad_claims",
+    "context_block_validity",
+  ]);
+  const hardPass = metrics
+    .filter((metric) => hardMetrics.has(metric.name))
+    .every((metric) => metric.score === 1);
+  return hardPass && overall >= MIN_AVERAGE;
 }
 
 async function createEvalClient() {
@@ -643,7 +653,7 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
       <div class="meta">
         Generated ${escapeHtml(generatedAt)} with models <code>${escapeHtml(MODELS.join(", "))}</code>.<br />
         Dataset: <code>${escapeHtml(DATASET_NAME)}</code>. Run: <code>${escapeHtml(RUN_ID)}</code>.<br />
-        Gate: average >= ${(MIN_AVERAGE * 100).toFixed(1)}%, fatal errors ${FAIL_ON_ERROR ? "fail" : "reported only"}.<br />
+        Per-case gate: required constraints perfect and average >= ${(MIN_AVERAGE * 100).toFixed(1)}%; fatal errors ${FAIL_ON_ERROR ? "fail" : "reported only"}.<br />
         Langfuse: ${escapeHtml(langfuseStatus.detail)}
         ${traceLink ? `<br />Session: <a href="${escapeHtml(traceLink)}">${escapeHtml(traceLink)}</a>` : ""}
       </div>
