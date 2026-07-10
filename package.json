@@ -9,7 +9,7 @@
     "build": "bun run build.ts",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test src evals/lib",
-    "check": "bun run typecheck && bun test src && bun run build",
+    "check": "bun run typecheck && bun run test && bun run build",
     "check:infra": "cd infra-cdk && npm test -- --runInBand && npm run build",
     "eval:research": "bun evals/research-evals.ts",
     "eval:contracts": "bun test evals/lib"
