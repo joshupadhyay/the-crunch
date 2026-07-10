@@ -4,6 +4,16 @@ import type { ContentBlock, Tool } from "@anthropic-ai/sdk/resources/messages";
 import { mkdir } from "node:fs/promises";
 import { SYSTEM_PROMPT } from "../src/system-prompt";
 import { TOOLS } from "../src/tools";
+import type {
+  AgentTrace,
+  EvalRunManifest,
+  TraceScore,
+} from "./lib/contracts";
+import {
+  createRunManifest,
+  createSingleTurnTrace,
+  tracesToJsonl,
+} from "./lib/run-artifacts";
 
 type EvalCase = {
   id: string;
@@ -28,24 +38,60 @@ type MetricResult = {
 type CaseResult = {
   id: string;
   name: string;
+  model: string;
   input: string;
   outputText: string;
   toolCalls: string[];
   metrics: MetricResult[];
   overall: number;
+  routingPassed: boolean;
+  durationMs: number;
+  traceId: string;
   error?: string;
 };
 
-const MODEL =
+type ToolCall = {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+};
+
+type AssistantTraceEvent =
+  | { kind: "message"; content: string }
+  | {
+      kind: "tool_call";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    };
+
+type RunCaseResult = {
+  result: CaseResult;
+  trace: AgentTrace;
+};
+
+const DEFAULT_MODEL = process.env.OPENROUTER_API_KEY
+  ? "deepseek/deepseek-v4-pro"
+  : "claude-haiku-4-5-20251001";
+const MODELS = (
+  process.env.EVAL_MODELS ??
   process.env.EVAL_MODEL ??
   process.env.LLM_MODEL ??
-  (process.env.OPENROUTER_API_KEY
-    ? "deepseek/deepseek-v4-pro"
-    : "claude-haiku-4-5-20251001");
+  DEFAULT_MODEL
+)
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean);
+const PROVIDER =
+  process.env.EVAL_PROVIDER ??
+  (process.env.OPENROUTER_API_KEY ? "openrouter" : "anthropic");
 const DATASET_NAME = "research/restaurant-concierge-regression";
 const RUN_ID = `research-eval-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 const REPORT_DIR = "evals/reports";
+const RUN_REPORT_DIR = `${REPORT_DIR}/runs/${RUN_ID}`;
 const CASES_PATH = "evals/research-eval-cases.json";
+const PROMPT_PATH = "src/system-prompt.ts";
+const MAX_TOKENS = 1200;
 const LANGFUSE_HOST = process.env.LANGFUSE_BASE_URL ?? process.env.LANGFUSE_HOST;
 const FAIL_ON_ERROR = process.env.EVAL_FAIL_ON_ERROR === "true";
 const MIN_AVERAGE = Number(process.env.EVAL_MIN_AVERAGE ?? 0.8);
@@ -55,11 +101,60 @@ const SECRET_PATTERNS = [
   /pk-lf-[a-zA-Z0-9_-]{12,}/g,
   /sk-lf-[a-zA-Z0-9_-]{12,}/g,
   /postgres(?:ql)?:\/\/[^\s"'<>]+/g,
-  /(ANTHROPIC_API_KEY|EXA_API_KEY|DATABASE_URL|TWITTER_SECRET|MAPBOX_ACCESS_TOKEN)=\S+/g,
+  /(ANTHROPIC_API_KEY|OPENROUTER_API_KEY|DEEPSEEK_API_KEY|LANGFUSE_SECRET_KEY|EXA_API_KEY|DATABASE_URL|TWITTER_SECRET|MAPBOX_ACCESS_TOKEN)=\S+/g,
 ];
 
+function validateEvalCases(value: unknown): asserts value is EvalCase[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("Eval dataset must be a non-empty array.");
+  }
+
+  const ids = new Set<string>();
+  for (const [index, testCase] of value.entries()) {
+    if (!testCase || typeof testCase !== "object") {
+      throw new Error(`Eval case ${index} must be an object.`);
+    }
+    const candidate = testCase as Partial<EvalCase>;
+    if (
+      typeof candidate.id !== "string" ||
+      typeof candidate.name !== "string" ||
+      typeof candidate.input !== "string" ||
+      !candidate.expected ||
+      typeof candidate.expected !== "object"
+    ) {
+      throw new Error(
+        `Eval case ${index} requires string id, name, input, and expected fields.`,
+      );
+    }
+    if (ids.has(candidate.id)) {
+      throw new Error(`Duplicate eval case id: ${candidate.id}`);
+    }
+    ids.add(candidate.id);
+
+    for (const field of ["requiredText", "forbiddenText"] as const) {
+      const patterns = candidate.expected[field] ?? [];
+      if (!Array.isArray(patterns)) {
+        throw new Error(`${candidate.id}.${field} must be an array.`);
+      }
+      for (const pattern of patterns) {
+        if (typeof pattern !== "string") {
+          throw new Error(`${candidate.id}.${field} values must be strings.`);
+        }
+        try {
+          new RegExp(pattern, "i");
+        } catch {
+          throw new Error(`${candidate.id}.${field} has invalid regex: ${pattern}`);
+        }
+      }
+    }
+  }
+}
+
 function sanitize(value: unknown): string {
-  let text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  let text =
+    typeof value === "string"
+      ? value
+      : (JSON.stringify(value, null, 2) ?? String(value));
   for (const pattern of SECRET_PATTERNS) {
     text = text.replace(pattern, "[REDACTED]");
   }
@@ -83,10 +178,33 @@ function textFromContent(content: ContentBlock[]) {
     .trim();
 }
 
-function toolsFromContent(content: ContentBlock[]) {
+function toolCallsFromContent(content: ContentBlock[]): ToolCall[] {
   return content
     .filter((block) => block.type === "tool_use")
-    .map((block) => block.name);
+    .map((block) => ({
+      id: block.id,
+      name: block.name,
+      input: block.input as Record<string, unknown>,
+    }));
+}
+
+function assistantEventsFromContent(
+  content: ContentBlock[],
+): AssistantTraceEvent[] {
+  const events: AssistantTraceEvent[] = [];
+  for (const block of content) {
+    if (block.type === "text") {
+      events.push({ kind: "message", content: block.text });
+    } else if (block.type === "tool_use") {
+      events.push({
+        kind: "tool_call",
+        id: block.id,
+        name: block.name,
+        input: block.input as Record<string, unknown>,
+      });
+    }
+  }
+  return events;
 }
 
 function extractContextBlock(text: string) {
@@ -203,51 +321,81 @@ function errorMetrics(error: string): MetricResult[] {
   ];
 }
 
-async function runCase(testCase: EvalCase): Promise<CaseResult> {
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!openRouterKey && !anthropicKey) {
-    const error =
-      "OPENROUTER_API_KEY or ANTHROPIC_API_KEY is required; live model evaluation skipped.";
-    return {
-      id: testCase.id,
-      name: testCase.name,
-      input: testCase.input,
-      outputText: "",
-      toolCalls: [],
-      metrics: errorMetrics(error),
-      overall: 0,
-      error,
-    };
+function traceScores(metrics: MetricResult[]): TraceScore[] {
+  return metrics.map((metric) => ({
+    name: metric.name,
+    value: metric.score,
+    detail: metric.detail,
+    grader: "deterministic",
+  }));
+}
+
+function passesRoutingGate(metrics: MetricResult[], overall: number): boolean {
+  return metrics.every((metric) => metric.score === 1) && overall >= MIN_AVERAGE;
+}
+
+async function createEvalClient() {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+
+  if (PROVIDER === "openrouter") {
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) {
+      throw new Error(
+        "EVAL_PROVIDER=openrouter requires OPENROUTER_API_KEY.",
+      );
+    }
+    return new Anthropic({
+      apiKey: null,
+      authToken: key,
+      baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api",
+      defaultHeaders: {
+        "HTTP-Referer":
+          process.env.OPENROUTER_HTTP_REFERER ??
+          "https://d2w56c6hcnyw72.cloudfront.net",
+        "X-OpenRouter-Title":
+          process.env.OPENROUTER_APP_TITLE ?? "The Crunch",
+      },
+    });
   }
+
+  if (PROVIDER === "anthropic") {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) {
+      throw new Error(
+        "EVAL_PROVIDER=anthropic requires ANTHROPIC_API_KEY.",
+      );
+    }
+    return new Anthropic({ apiKey: key });
+  }
+
+  throw new Error(
+    `Unsupported EVAL_PROVIDER "${PROVIDER}". Use openrouter or anthropic.`,
+  );
+}
+
+async function runCase(
+  testCase: EvalCase,
+  model: string,
+  manifest: EvalRunManifest,
+): Promise<RunCaseResult> {
+  const startedAt = new Date().toISOString();
+  const startedMs = performance.now();
+  const priorMessages = (testCase.messages ?? []).map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
 
   try {
     await import("../src/observability");
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic(
-      openRouterKey
-        ? {
-            apiKey: null,
-            authToken: openRouterKey,
-            baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api",
-            defaultHeaders: {
-              "HTTP-Referer":
-                process.env.OPENROUTER_HTTP_REFERER ??
-                "https://d2w56c6hcnyw72.cloudfront.net",
-              "X-OpenRouter-Title":
-                process.env.OPENROUTER_APP_TITLE ?? "The Crunch",
-            },
-          }
-        : { apiKey: anthropicKey },
-    );
+    const client = await createEvalClient();
     const messages: MessageParam[] = [
       ...(testCase.messages ?? []),
       { role: "user", content: testCase.input },
     ];
 
     const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1200,
+      model,
+      max_tokens: MAX_TOKENS,
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS as Tool[],
@@ -256,32 +404,101 @@ async function runCase(testCase: EvalCase): Promise<CaseResult> {
       },
     });
 
+    const completedAt = new Date().toISOString();
+    const durationMs = Math.round(performance.now() - startedMs);
     const outputText = textFromContent(response.content);
-    const toolCalls = toolsFromContent(response.content);
+    const calls = toolCallsFromContent(response.content);
+    const toolCalls = calls.map((call) => call.name);
     const metrics = scoreCase(testCase, outputText, toolCalls);
     const overall =
       metrics.reduce((total, metric) => total + metric.score, 0) / metrics.length;
+    const routingPassed = passesRoutingGate(metrics, overall);
+    const trace = createSingleTurnTrace({
+      runId: RUN_ID,
+      caseId: testCase.id,
+      caseName: testCase.name,
+      model,
+      provider: PROVIDER,
+      gitSha: manifest.gitSha,
+      gitDirty: manifest.gitDirty,
+      worktreeSha256: manifest.worktreeSha256,
+      datasetSha256: manifest.dataset.sha256,
+      promptSha256: manifest.prompt.sha256,
+      input: testCase.input,
+      priorMessages,
+      assistantEvents: assistantEventsFromContent(response.content),
+      scores: traceScores(metrics),
+      overall,
+      startedAt,
+      completedAt,
+      durationMs,
+      stopReason: response.stop_reason,
+      tokenUsage: {
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens,
+        total: response.usage.input_tokens + response.usage.output_tokens,
+      },
+    });
 
     return {
-      id: testCase.id,
-      name: testCase.name,
-      input: testCase.input,
-      outputText,
-      toolCalls,
-      metrics,
-      overall,
+      result: {
+        id: testCase.id,
+        name: testCase.name,
+        model,
+        input: testCase.input,
+        outputText,
+        toolCalls,
+        metrics,
+        overall,
+        routingPassed,
+        durationMs,
+        traceId: trace.traceId,
+      },
+      trace,
     };
   } catch (error) {
+    const completedAt = new Date().toISOString();
+    const durationMs = Math.round(performance.now() - startedMs);
     const message = error instanceof Error ? sanitize(error.message) : sanitize(error);
-    return {
-      id: testCase.id,
-      name: testCase.name,
+    const metrics = errorMetrics(message);
+    const trace = createSingleTurnTrace({
+      runId: RUN_ID,
+      caseId: testCase.id,
+      caseName: testCase.name,
+      model,
+      provider: PROVIDER,
+      gitSha: manifest.gitSha,
+      gitDirty: manifest.gitDirty,
+      worktreeSha256: manifest.worktreeSha256,
+      datasetSha256: manifest.dataset.sha256,
+      promptSha256: manifest.prompt.sha256,
       input: testCase.input,
-      outputText: "",
-      toolCalls: [],
-      metrics: errorMetrics(message),
+      priorMessages,
+      assistantEvents: [],
+      scores: traceScores(metrics),
       overall: 0,
       error: message,
+      startedAt,
+      completedAt,
+      durationMs,
+    });
+
+    return {
+      result: {
+        id: testCase.id,
+        name: testCase.name,
+        model,
+        input: testCase.input,
+        outputText: "",
+        toolCalls: [],
+        metrics,
+        overall: 0,
+        routingPassed: false,
+        durationMs,
+        traceId: trace.traceId,
+        error: message,
+      },
+      trace,
     };
   }
 }
@@ -300,42 +517,56 @@ async function postLangfuseScores(results: CaseResult[]) {
   }
 
   const auth = btoa(`${publicKey}:${secretKey}`);
-  const scores = results.flatMap((result) => [
-    {
-      id: `${RUN_ID}-${result.id}-overall`,
-      name: "research_eval_overall",
-      value: result.overall,
-      dataType: "NUMERIC",
-      comment: `${result.id}: ${result.name}`,
-    },
-    ...result.metrics.map((metric) => ({
-      id: `${RUN_ID}-${result.id}-${metric.name}`,
-      name: `research_eval_${metric.name}`,
-      value: metric.score,
-      dataType: "NUMERIC",
-      comment: `${result.id}: ${metric.detail}`.slice(0, 500),
-    })),
-  ]);
-
-  for (const score of scores) {
-    const resp = await fetch(`${host.replace(/\/$/, "")}/api/public/scores`, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
+  const scores = results.flatMap((result) => {
+    const modelId = result.model.replace(/[^a-zA-Z0-9_-]/g, "-");
+    return [
+      {
+        id: `${RUN_ID}-${modelId}-${result.id}-overall`,
+        name: "research_eval_overall",
+        value: result.overall,
+        dataType: "NUMERIC",
+        comment: `${result.model} / ${result.id}: ${result.name}`,
       },
-      body: JSON.stringify({
-        ...score,
-        sessionId: RUN_ID,
-      }),
-    });
+      ...result.metrics.map((metric) => ({
+        id: `${RUN_ID}-${modelId}-${result.id}-${metric.name}`,
+        name: `research_eval_${metric.name}`,
+        value: metric.score,
+        dataType: "NUMERIC",
+        comment: `${result.model} / ${result.id}: ${metric.detail}`.slice(
+          0,
+          500,
+        ),
+      })),
+    ];
+  });
 
-    if (!resp.ok) {
-      return {
-        enabled: true,
-        detail: `Langfuse score post failed with HTTP ${resp.status}; local report still generated.`,
-      };
+  try {
+    for (const score of scores) {
+      const resp = await fetch(`${host.replace(/\/$/, "")}/api/public/scores`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...score,
+          sessionId: RUN_ID,
+        }),
+      });
+
+      if (!resp.ok) {
+        return {
+          enabled: true,
+          detail: `Langfuse score post failed with HTTP ${resp.status}; local report still generated.`,
+        };
+      }
     }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      enabled: true,
+      detail: `Langfuse score post failed: ${detail.slice(0, 200)}; local report still generated.`,
+    };
   }
 
   return {
@@ -348,7 +579,23 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
   const overall =
     results.reduce((total, result) => total + result.overall, 0) /
     Math.max(results.length, 1);
-  const passCount = results.filter((result) => result.overall >= 0.8 && !result.error).length;
+  const passCount = results.filter((result) => result.routingPassed).length;
+  const modelSummaries = MODELS.map((model) => {
+    const modelResults = results.filter((result) => result.model === model);
+    return {
+      model,
+      average:
+        modelResults.reduce((total, result) => total + result.overall, 0) /
+        Math.max(modelResults.length, 1),
+      passing: modelResults.filter((result) => result.routingPassed).length,
+      total: modelResults.length,
+      errors: modelResults.filter((result) => result.error).length,
+      durationMs: modelResults.reduce(
+        (total, result) => total + result.durationMs,
+        0,
+      ),
+    };
+  });
   const generatedAt = new Date().toISOString();
   const traceLink =
     LANGFUSE_HOST && langfuseStatus.enabled
@@ -394,7 +641,7 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
     <header>
       <h1>The Crunch Research Eval Report</h1>
       <div class="meta">
-        Generated ${escapeHtml(generatedAt)} with model <code>${escapeHtml(MODEL)}</code>.<br />
+        Generated ${escapeHtml(generatedAt)} with models <code>${escapeHtml(MODELS.join(", "))}</code>.<br />
         Dataset: <code>${escapeHtml(DATASET_NAME)}</code>. Run: <code>${escapeHtml(RUN_ID)}</code>.<br />
         Gate: average >= ${(MIN_AVERAGE * 100).toFixed(1)}%, fatal errors ${FAIL_ON_ERROR ? "fail" : "reported only"}.<br />
         Langfuse: ${escapeHtml(langfuseStatus.detail)}
@@ -404,9 +651,31 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
 
     <section class="summary">
       <div class="tile"><span>Overall</span><strong>${(overall * 100).toFixed(1)}%</strong></div>
-      <div class="tile"><span>Passing Cases</span><strong>${passCount}/${results.length}</strong></div>
+      <div class="tile"><span>Routing Passes</span><strong>${passCount}/${results.length}</strong></div>
       <div class="tile"><span>Cases</span><strong>${results.length}</strong></div>
       <div class="tile"><span>Pass Bar</span><strong>80%</strong></div>
+    </section>
+
+    <section class="case">
+      <div class="case-head"><div class="case-title">Model comparison</div></div>
+      <div class="body">
+        <table class="metrics">
+          <thead><tr><th>Model</th><th>Average</th><th>Passing</th><th>Errors</th><th>Total latency</th></tr></thead>
+          <tbody>
+            ${modelSummaries
+              .map(
+                (summary) => `<tr>
+                  <td><code>${escapeHtml(summary.model)}</code></td>
+                  <td>${(summary.average * 100).toFixed(1)}%</td>
+                  <td>${summary.passing}/${summary.total}</td>
+                  <td>${summary.errors}</td>
+                  <td>${summary.durationMs} ms</td>
+                </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
     </section>
 
     ${results
@@ -416,9 +685,9 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
         <div class="case-head">
           <div>
             <div class="case-title">${escapeHtml(result.name)}</div>
-            <div class="meta"><code>${escapeHtml(result.id)}</code></div>
+            <div class="meta"><code>${escapeHtml(result.model)}</code> · <code>${escapeHtml(result.id)}</code> · ${escapeHtml(result.durationMs)} ms · trace <code>${escapeHtml(result.traceId)}</code></div>
           </div>
-          <div class="score ${result.overall >= 0.8 && !result.error ? "pass" : "fail"}">${(result.overall * 100).toFixed(1)}%</div>
+          <div class="score ${result.routingPassed ? "pass" : "fail"}">${(result.overall * 100).toFixed(1)}%</div>
         </div>
         <div class="body">
           <div><strong>Input</strong><pre><code>${escapeHtml(result.input)}</code></pre></div>
@@ -457,31 +726,57 @@ function renderHtml(results: CaseResult[], langfuseStatus: { enabled: boolean; d
 }
 
 async function main() {
-  const cases = (await Bun.file(CASES_PATH).json()) as EvalCase[];
-  await mkdir(REPORT_DIR, { recursive: true });
+  if (MODELS.length === 0) {
+    throw new Error("EVAL_MODELS must contain at least one model ID.");
+  }
+
+  const casesDocument: unknown = await Bun.file(CASES_PATH).json();
+  validateEvalCases(casesDocument);
+  const cases = casesDocument;
+  await mkdir(RUN_REPORT_DIR, { recursive: true });
+  const manifest = await createRunManifest({
+    runId: RUN_ID,
+    datasetName: DATASET_NAME,
+    datasetPath: CASES_PATH,
+    promptPath: PROMPT_PATH,
+    caseCount: cases.length,
+    provider: PROVIDER,
+    models: MODELS,
+    maxTokens: MAX_TOKENS,
+  });
 
   const results: CaseResult[] = [];
-  for (const testCase of cases) {
-    console.log(`Running ${testCase.id}`);
-    results.push(await runCase(testCase));
+  const traces: AgentTrace[] = [];
+  for (const model of MODELS) {
+    for (const testCase of cases) {
+      console.log(`Running ${model} / ${testCase.id}`);
+      const run = await runCase(testCase, model, manifest);
+      results.push(run.result);
+      traces.push(run.trace);
+    }
   }
+
+  const reportPath = `${REPORT_DIR}/research-eval-report.html`;
+  const resultsPath = `${REPORT_DIR}/research-eval-results.json`;
+  const versionedReportPath = `${RUN_REPORT_DIR}/report.html`;
+  const versionedResultsPath = `${RUN_REPORT_DIR}/results.json`;
+  const manifestPath = `${RUN_REPORT_DIR}/manifest.json`;
+  const tracesPath = `${RUN_REPORT_DIR}/traces.jsonl`;
+
+  await Bun.write(manifestPath, sanitize(manifest));
+  await Bun.write(tracesPath, sanitize(tracesToJsonl(traces)));
 
   const langfuseStatus = await postLangfuseScores(results);
   const report = renderHtml(results, langfuseStatus);
-  const reportPath = `${REPORT_DIR}/research-eval-report.html`;
-  const resultsPath = `${REPORT_DIR}/research-eval-results.json`;
-
   await Bun.write(reportPath, report);
-  await Bun.write(
-    resultsPath,
-    sanitize({
-      runId: RUN_ID,
-      model: MODEL,
-      datasetName: DATASET_NAME,
-      langfuseStatus,
-      results,
-    }),
-  );
+  await Bun.write(versionedReportPath, report);
+  const resultDocument = sanitize({
+    manifest,
+    langfuseStatus,
+    results,
+  });
+  await Bun.write(resultsPath, resultDocument);
+  await Bun.write(versionedResultsPath, resultDocument);
 
   const average =
     results.reduce((total, result) => total + result.overall, 0) /
@@ -490,15 +785,32 @@ async function main() {
 
   console.log(`Report: ${reportPath}`);
   console.log(`Results: ${resultsPath}`);
+  console.log(`Run artifacts: ${RUN_REPORT_DIR}`);
   console.log(`Average: ${(average * 100).toFixed(1)}%`);
   console.log(`Fatal errors: ${errorCount}`);
 
-  if (FAIL_ON_ERROR && (errorCount > 0 || average < MIN_AVERAGE)) {
+  const failedModels = MODELS.filter((model) => {
+    const modelResults = results.filter((result) => result.model === model);
+    const modelAverage =
+      modelResults.reduce((total, result) => total + result.overall, 0) /
+      Math.max(modelResults.length, 1);
+    return (
+      modelResults.some((result) => result.error || !result.routingPassed) ||
+      modelAverage < MIN_AVERAGE
+    );
+  });
+
+  if (FAIL_ON_ERROR && failedModels.length > 0) {
     console.error(
-      `Research eval gate failed: average ${(average * 100).toFixed(1)}%, fatal errors ${errorCount}.`,
+      `Research eval gate failed for models: ${failedModels.join(", ")}.`,
     );
     process.exitCode = 1;
   }
 }
 
-await main();
+try {
+  await main();
+} finally {
+  const { shutdownObservability } = await import("../src/observability");
+  await shutdownObservability();
+}
